@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Las Palmas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f0f2f5;color:#222;font-size:14px}
+.hdr{background:#1a7a4a;color:#fff;padding:10px 14px;position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center}
+.hdr h1{font-size:15px;font-weight:700}.hdr p{font-size:10px;opacity:.8;margin-top:1px}
+.hdr-r{display:flex;align-items:center;gap:8px}
+select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#1a7a4a;font-weight:700;cursor:pointer}
+.dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0}
+.dot.ok{background:#4caf50}
+.tabs{display:flex;overflow-x:auto;background:#fff;border-bottom:1px solid #ddd;position:sticky;top:52px;z-index:99;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:10px 12px;font-size:11px;font-weight:500;color:#888;border-bottom:3px solid transparent;cursor:pointer;background:transparent;border-top:none;border-left:none;border-right:none;white-space:nowrap}
+.tab.on{color:#1a7a4a;border-bottom-color:#1a7a4a}
+.pnl{display:none;padding:12px 12px 80px}.pnl.on{display:block}
+.card{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ct{font-size:13px;font-weight:700;margin-bottom:10px;color:#222}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.met{background:#fff;border-radius:10px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ml{font-size:10px;color:#888;margin-bottom:2px}
+.mv{font-size:18px;font-weight:700}
+.mv.vd{color:#1a7a4a}.mv.rj{color:#e53935}.mv.nj{color:#f57c00}
+.fg{margin-bottom:8px}
+.fg label{font-size:10px;color:#888;display:block;margin-bottom:2px;font-weight:600;text-transform:uppercase}
+.fg input,.fg select{width:100%;padding:9px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#222}
+.btn{background:#1a7a4a;color:#fff;border:none;border-radius:8px;width:100%;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+.btn:disabled{opacity:.5}
+.btn.rj{background:#e53935}
+.btn.az{background:#1565c0}
+.btn.gr{background:#555}
+.btn-sm{padding:4px 8px;font-size:11px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer}
+.btn-ed{background:#fff8e1;border-color:#f9a825}
+.btn-dl{background:#fdecea;color:#c62828;border-color:#e53935}
+/* Lote card */
+.lc{background:#fff;border-radius:10px;margin-bottom:7px;border-left:4px solid #ddd;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 12px}
+.lc.pag{border-left-color:#1a7a4a}
+.lc.pen{border-left-color:#e53935}
+.lc-top{display:flex;justify-content:space-between;align-items:flex-start}
+.lc-left{flex:1;min-width:0}
+.lc-name{font-size:12px;font-weight:700;color:#222}
+.lc-sub{font-size:11px;color:#888;margin-top:3px;display:flex;flex-wrap:wrap;gap:6px}
+.lc-monto{font-size:15px;font-weight:700;white-space:nowrap;margin-left:8px}
+.lc-btns{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+/* Rendicion table */
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl table{min-width:580px;border-collapse:collapse;font-size:11px;width:100%}
+.tbl th{background:#f5f5f5;padding:6px 5px;text-align:left;font-size:10px;font-weight:700;color:#888;border-bottom:1px solid #ddd;white-space:nowrap}
+.tbl td{padding:6px 5px;border-bottom:.5px solid #f0f0f0;white-space:nowrap}
+.tbl tfoot td{background:#f5f5f5;font-weight:700;padding:7px 5px;border-top:1px solid #ddd}
+.num{text-align:right}
+.srch{width:100%;padding:9px 12px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#222;margin-bottom:10px}
+.empty{text-align:center;color:#aaa;padding:24px;font-size:13px}
+.pb{height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:4px}
+.pf{height:100%;background:#1a7a4a;border-radius:3px;transition:width .5s}
+/* Modal */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;padding:16px}
+.mbox{background:#fff;border-radius:14px;padding:16px;max-width:440px;margin:10px auto}
+.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.mtit{font-size:14px;font-weight:700}
+.mclose{background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1}
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+/* Recibo */
+.rw{background:#f5f5f5;padding:12px;border-radius:12px}
+.rbx{background:#fff;border-radius:12px;padding:16px}
+.rh{text-align:center;padding-bottom:10px;border-bottom:1px solid #eee;margin-bottom:10px}
+.rh h2{font-size:14px;font-weight:700;color:#1a7a4a}
+.rh p{font-size:10px;color:#888;margin-top:2px}
+.rr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:.5px solid #f0f0f0;font-size:12px}
+.rr:last-child{border-bottom:none}.rlab{color:#888}
+.rtot{display:flex;justify-content:space-between;padding:8px 0 0;font-size:15px;font-weight:700;margin-top:6px;border-top:1px solid #eee}
+.rtot span:last-child{color:#1a7a4a}
+.rfirma{text-align:center;font-size:9px;color:#aaa;margin-top:10px;padding-top:8px;border-top:.5px solid #f0f0f0}
+/* Estado */
+.er{display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid #f0f0f0;font-size:13px}
+.er:last-child{border-bottom:none}
+.er.tot{font-weight:700;font-size:14px;padding-top:10px;border-top:1px solid #ddd;border-bottom:none}
+.el{color:#888;flex:1;padding-right:8px}
+@media print{.hdr,.tabs,.fg,.btn,.srch,.btn-sm,.toast,.modal{display:none!important}.pnl{display:none!important;padding:0}#pnl-rec{display:block!important}.rw{background:white;padding:0}}
+#login-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#1a7a4a;z-index:1000;display:flex;align-items:center;justify-content:center}
+.login-box{background:#fff;border-radius:16px;padding:28px 24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.login-logo{text-align:center;margin-bottom:20px}
+.login-logo h2{color:#1a7a4a;font-size:18px;margin-top:8px}
+.login-logo p{color:#888;font-size:11px;margin-top:4px}
+.login-err{background:#fdecea;color:#c62828;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;display:none}
+.log-item{background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:6px;border-left:3px solid #1a7a4a;font-size:12px}
+.log-user{font-weight:700;color:#1a7a4a}
+.log-time{font-size:10px;color:#aaa;margin-top:2px}
+
+.per-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.per-item{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 6px;background:#f8f9fa;border-radius:6px;cursor:pointer}
+.per-item input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#1a7a4a}
+.per-item.ord{border-left:2px solid #1565c0}
+.per-item.ext{border-left:2px solid #1a7a4a}
+.per-item.otro{border-left:2px solid #888}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div style="font-size:40px">🏘</div>
+      <h2>Barrio Las Palmas</h2>
+      <p>Sistema de administración de consorcio</p>
+    </div>
+    <div class="login-err" id="login-err">Usuario o contraseña incorrectos</div>
+    <div class="fg"><label>Usuario</label><input type="text" id="l-user" placeholder="ej: jponce" autocomplete="username"></div>
+    <div class="fg"><label>Contraseña</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn" onclick="doLogin()" style="margin-top:8px">Ingresar</button>
+  </div>
+</div>
+
+<div class="hdr">
+  <div><h1>🏘 Barrio Las Palmas</h1><p id="hdr-p">Cobranzas Mayo 2026</p></div>
+  <div class="hdr-r">
+    <span id="hdr-user" style="font-size:10px;opacity:.8"></span>
+    <select class="mes" id="sel-mes" onchange="cambiarMes(this.value)">
+      <option value="2026-05" selected>Mayo 2026</option>
+      <option value="2026-06">Junio 2026</option>
+      <option value="2026-07">Julio 2026</option>
+    </select>
+    <div class="dot" id="dot"></div>
+    <button onclick="cerrarSesion()" style="font-size:10px;padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer">Salir</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="ST('cob',this)">💰 Cobros del mes</button>
+  <button class="tab" onclick="ST('rend',this)">📋 Informe mensual</button>
+  <button class="tab" onclick="ST('egr',this)">📤 Gastos</button>
+  <button class="tab" onclick="ST('deu',this)">⚠️ Deudores</button>
+  <button class="tab" onclick="ST('int',this)">📐 Calcular intereses</button>
+  <button class="tab" onclick="ST('est',this)">📊 Resumen financiero</button>
+  <button class="tab" onclick="ST('rec',this)">🧾 Ver recibos</button>
+  <button class="tab" onclick="ST('conc',this)">🏦 Control bancario</button>
+  <button class="tab" onclick="ST('act',this)">📜 Historial</button>
+</div>
+
+<!-- COBRANZAS -->
+<div id="pnl-cob" class="pnl on">
+  <div class="g2">
+    <div class="met"><div class="ml">Lotes con cobros</div><div class="mv vd" id="m-pag">—</div></div>
+    <div class="met"><div class="ml">Sin cobros</div><div class="mv rj" id="m-pen">—</div></div>
+    <div class="met"><div class="ml">Total cobrado</div><div class="mv vd" id="m-tot" style="font-size:13px">—</div></div>
+    <div class="met"><div class="ml">% avance</div><div class="mv nj" id="m-pct">—</div></div>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;font-weight:600;margin-bottom:4px">Avance</div>
+    <div class="pb"><div class="pf" id="prog" style="width:0%"></div></div>
+    <div style="font-size:10px;color:#888;margin-top:3px" id="prog-t"></div>
+  </div>
+  <!-- Importar -->
+  <div class="card">
+    <div class="ct">📥 Importar cobros desde JSON</div>
+    <input type="file" id="imp-file" accept=".json" style="font-size:11px;margin-bottom:8px;width:100%">
+    <button class="btn az" onclick="importar()">📥 Importar al mes actual</button>
+    <button class="btn rj" onclick="limpiar()" style="margin-top:6px">🗑 Limpiar todos los cobros del mes</button>
+  </div>
+  <!-- Registrar -->
+  <div class="card">
+    <div class="ct">➕ Registrar cobro</div>
+    <div class="fg"><label>Lote</label><select id="sl"></select></div>
+    <div class="fg"><label>Concepto</label>
+      <select id="sc">
+        <option value="ordinaria">Exp. Ordinaria</option>
+        <option value="extraordinaria">Exp. Extraordinaria</option>
+        <option value="cargo">Cargo</option>
+      </select>
+    </div>
+    <div class="fg"><label>Períodos que cancela</label>
+<div class="per-grid">
+  <label class="per-item ord"><input type="checkbox" name="sper" value="oe"> Ene ord</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="ob"> Feb ord</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="or"> Mar ord</label>
+  <label class="per-item ext"><input type="checkbox" name="sper" value="xr"> Mar ext</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="oa"> Abr ord</label>
+  <label class="per-item ext"><input type="checkbox" name="sper" value="xa"> Abr ext</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="oy"> May ord</label>
+  <label class="per-item ext"><input type="checkbox" name="sper" value="xy"> May ext</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="ju_ord"> Jun ord</label>
+  <label class="per-item ext"><input type="checkbox" name="sper" value="ju_ext"> Jun ext</label>
+  <label class="per-item otro"><input type="checkbox" name="sper" value="otro"> Otro</label>
+</div></div><div class="fg"><label>Monto ($)</label><input type="number" id="im" inputmode="numeric" placeholder="90000"></div>
+    <div class="fg"><label>Forma</label><select id="sf" onchange="toggleLemon(this.value)"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
+    <div class="fg" id="fg-lemon" style="display:none"><label>N° transacción Lemon</label><input type="text" id="ilemon" placeholder="últimos dígitos ej: 3401b"></div>
+    <div class="fg"><label>N° Recibo</label><input type="text" id="ir" placeholder="355"></div>
+    <div class="fg"><label>Fecha</label><input type="text" id="id" placeholder="05/06/2026"></div>
+    <div class="fg"><label>Observación</label><input type="text" id="iob" placeholder="Cuota 3/12"></div>
+    <button class="btn" id="btn-reg" onclick="registrar()">✓ Registrar cobro</button>
+  </div>
+  <input class="srch" type="search" placeholder="🔍 Buscar lote o propietario..." oninput="filtrarL(this.value)">
+  <div id="lista-cob"><div class="empty">Cargando...</div></div>
+</div>
+
+<!-- RENDICION -->
+<div id="pnl-rend" class="pnl">
+  <div class="card" style="padding:10px 12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#1a7a4a">Consorcio Barrio Las Palmas</div>
+        <div style="font-size:10px;color:#888" id="rend-tit">Rendición — Mayo 2026</div>
+        <div style="font-size:10px;color:#888">Contadora: Juana B. Varvaro CPN M.P 7450</div>
+      </div>
+      <button class="btn" onclick="renderRend()" style="width:auto;padding:8px 14px;font-size:12px">🔄</button>
+    </div>
+  </div>
+  <input class="srch" type="search" placeholder="🔍 Buscar..." oninput="filtrarR(this.value)">
+  <div class="card" style="padding:8px">
+    <div class="tbl"><table>
+      <thead><tr>
+        <th style="width:28px">N°</th><th style="min-width:65px">Lote</th><th style="min-width:120px">Propietario</th>
+        <th class="num" style="min-width:70px;color:#1565c0">Ordinaria</th>
+        <th class="num" style="min-width:75px;color:#1a7a4a">Extraordinaria</th>
+        <th class="num" style="min-width:60px;color:#e65100">Cargo</th>
+        <th class="num" style="min-width:65px">Recibo</th>
+        <th class="num" style="min-width:75px">Fecha</th>
+        <th class="num" style="min-width:70px;font-weight:700;color:#222">Total</th>
+      </tr></thead>
+      <tbody id="tb-rend"></tbody>
+      <tfoot id="tf-rend"><tr><td colspan="9" style="padding:6px 5px">—</td></tr></tfoot>
+    </table></div>
+  </div>
+</div>
+
+<!-- EGRESOS -->
+<div id="pnl-egr" class="pnl">
+  <div class="g2">
+    <div class="met"><div class="ml">Total egresos</div><div class="mv rj" id="eg-tot">—</div></div>
+    <div class="met"><div class="ml">Items</div><div class="mv" id="eg-cnt">—</div></div>
+  </div>
+  <div class="card">
+    <div class="ct">📥 Importar egresos desde JSON</div>
+    <input type="file" id="imp-egr-file" accept=".json" style="font-size:11px;margin-bottom:8px;width:100%">
+    <button class="btn az" onclick="importarEgr()">📥 Importar egresos al mes actual</button>
+  </div>
+  <div class="card">
+    <div class="ct">➕ Agregar egreso</div>
+    <div class="fg"><label>Detalle</label><input type="text" id="ed" placeholder="Concepto del gasto"></div>
+    <div class="fg"><label>Categoría</label><select id="ec"><option>Seguridad</option><option>Honorarios</option><option>Mantenimiento</option><option>Servicios</option><option>Limpieza</option><option>Otro</option></select></div>
+    <div class="fg"><label>Monto ($)</label><input type="number" id="em" inputmode="numeric" placeholder="0"></div>
+    <div class="fg"><label>Comprobante</label><input type="text" id="ecp" placeholder="0001-00000109"></div>
+    <div class="fg"><label>Link comprobante 1 (OneDrive/Drive)</label><input type="text" id="elink" placeholder="https://1drv.ms/..."></div>
+    <div class="fg"><label>Link comprobante 2 (OneDrive/Drive)</label><input type="text" id="elink2" placeholder="https://1drv.ms/..."></div>
+    <div class="fg"><label>Fecha</label><input type="date" id="ef"></div>
+    <div class="fg"><label>Estado</label><select id="ee"><option value="pagada">Pagada</option><option value="recibida">Recibida</option><option value="pendiente">Pendiente</option></select></div>
+    <button class="btn" onclick="addEgr()">✓ Agregar egreso</button>
+  </div>
+  <div id="lista-egr"><div class="empty">Cargando...</div></div>
+</div>
+
+<!-- DEUDORES -->
+<div id="pnl-deu" class="pnl">
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button class="btn" onclick="imprimirDeu()" style="background:#1565c0;width:auto;padding:8px 16px">🖨️ Imprimir informe</button>
+  </div>
+  <div class="g2">
+    <div class="met"><div class="ml">Deudores</div><div class="mv rj">35</div></div>
+    <div class="met"><div class="ml">Capital ordinario</div><div class="mv rj" id="deu-tot-ord">—</div></div>
+    <div class="met"><div class="ml">Capital extraordinario</div><div class="mv rj" id="deu-tot-ext">—</div></div>
+    <div class="met"><div class="ml">Total capital</div><div class="mv rj" id="deu-tot-gen">—</div></div>
+  </div>
+
+  <!-- PANEL ALERTAS WSP -->
+  <div class="card" style="border-left:4px solid #e53935">
+    <div class="ct">📢 Avisos pendientes de envío</div>
+    <div id="alertas-wsp"></div>
+  </div>
+
+  <div id="lista-deu"></div>
+</div>
+
+<!-- INTERESES -->
+<div id="pnl-int" class="pnl">
+  <div style="background:#fff8e1;padding:9px 12px;border-radius:10px;margin-bottom:10px;font-size:11px;border-left:3px solid #f9a825">
+    <b>Art. 8 Reglamento:</b> Interés punitorio del <b>4% mensual</b> desde el día 15 de cada mes vencido.
+  </div>
+  <div style="background:#fdecea;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:11px;border-left:3px solid #e53935;text-align:center">
+    ⚠️ <b>Sujeto a verificación</b>
+  </div>
+  <div class="card">
+    <div class="ct">📐 Todos los deudores</div>
+    <div class="fg"><label>Calcular al día</label><input type="date" id="int-f1"></div>
+    <button class="btn" onclick="calcTodos()">📐 Calcular todos</button>
+  </div>
+  <div class="card">
+    <div class="ct">🔍 Por lote específico</div>
+    <div class="fg"><label>Lote deudor</label><select id="int-lote"><option value="">— Seleccioná —</option></select></div>
+    <div class="fg"><label>Calcular al día</label><input type="date" id="int-f2"></div>
+    <button class="btn" onclick="calcLote()">🔍 Calcular este lote</button>
+  </div>
+  <div id="int-res"></div>
+</div>
+
+<!-- ESTADO -->
+<div id="pnl-est" class="pnl">
+  <div class="card">
+    <div class="ct">📊 Estado financiero</div>
+    <div class="er"><span class="el">Saldo anterior</span><span style="font-weight:600">$6.022.380</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">Ingresos por cobros</span><span style="color:#1a7a4a;font-weight:600" id="ef-ing">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">Cheque diferido Morales (vto 12/06)</span><span style="color:#f57c00;font-weight:600">$711.892</span></div>
+    <div class="er"><span class="el" style="font-weight:700">Total ingreso</span><span style="color:#1a7a4a;font-weight:700" id="ef-toting">$0</span></div>
+    <div class="er"><span class="el">Egresos del período</span><span style="color:#e53935;font-weight:600" id="ef-egr">$0</span></div>
+    <div class="er tot"><span class="el">Saldo al cierre</span><span style="color:#1a7a4a" id="ef-saldo">$0</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">🏘 Datos del consorcio</div>
+    <div class="er"><span class="el">Barrio</span><span style="font-size:12px">Las Palmas · William Cross 3302</span></div>
+    <div class="er"><span class="el">Administradores</span><span style="font-size:11px">Juan Ponce / Walter Vallejo</span></div>
+    <div class="er"><span class="el">Contadora</span><span style="font-size:11px">Juana B. Varvaro M.P 7450</span></div>
+    <div class="er"><span class="el">Lotes</span><span style="font-size:12px">84 (40 Sur / 44 Norte)</span></div>
+  </div>
+</div>
+
+<!-- RECIBOS -->
+<div id="pnl-rec" class="pnl">
+  <div class="card">
+    <div class="ct">🧾 Ver recibo</div>
+    <div class="fg"><label>Seleccioná el lote</label><select id="rs" onchange="verRecibo()"></select></div>
+    <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+  <div id="rc"><div class="empty">Seleccioná un lote</div></div>
+</div>
+
+<!-- ACTIVIDAD -->
+<div id="pnl-act" class="pnl">
+  <div class="card">
+    <div class="ct">📜 Registro de actividad</div>
+    <div id="act-lista"><div class="empty">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- MODAL COBRO -->
+<div class="modal" id="mod-cob">
+  <div class="mbox">
+    <div class="mhdr"><div class="mtit">✏️ Editar cobro</div><button class="mclose" onclick="cerrar('mod-cob')">✕</button></div>
+    <div id="mod-info" style="background:#e8f5ee;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:700;color:#14603a;margin-bottom:11px"></div>
+    <div class="fg"><label>Concepto</label><select id="me-c"><option value="ordinaria">Exp. Ordinaria</option><option value="extraordinaria">Exp. Extraordinaria</option><option value="cargo">Cargo</option></select></div>
+    <div class="fg"><label>Períodos que cancela</label>
+<div class="per-grid" id="me-per-grid">
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="oe"> Ene ord</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="ob"> Feb ord</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="or"> Mar ord</label>
+  <label class="per-item ext"><input type="checkbox" name="me-per" value="xr"> Mar ext</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="oa"> Abr ord</label>
+  <label class="per-item ext"><input type="checkbox" name="me-per" value="xa"> Abr ext</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="oy"> May ord</label>
+  <label class="per-item ext"><input type="checkbox" name="me-per" value="xy"> May ext</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="ju_ord"> Jun ord</label>
+  <label class="per-item ext"><input type="checkbox" name="me-per" value="ju_ext"> Jun ext</label>
+  <label class="per-item otro"><input type="checkbox" name="me-per" value="otro"> Otro</label>
+</div></div>
+    <div class="fg"><label>Monto ($)</label><input type="number" id="me-m" inputmode="numeric"></div>
+    <div class="fg"><label>Forma</label><select id="me-f"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
+    <div class="fg"><label>N° Recibo</label><input type="text" id="me-r"></div>
+    <div class="fg"><label>Fecha</label><input type="text" id="me-d"></div>
+    <div class="fg"><label>Transferencia</label><input type="text" id="me-t"></div>
+    <div class="fg"><label>Observación</label><input type="text" id="me-o"></div>
+    <button class="btn" id="btn-se" onclick="guardarCobro()">✓ Guardar</button>
+    <button onclick="cerrar('mod-cob')" style="width:100%;margin-top:7px;padding:10px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL EGRESO -->
+<div class="modal" id="mod-egr">
+  <div class="mbox">
+    <div class="mhdr"><div class="mtit">✏️ Editar egreso</div><button class="mclose" onclick="cerrar('mod-egr')">✕</button></div>
+    <div class="fg"><label>Detalle</label><input type="text" id="ee-d"></div>
+    <div class="fg"><label>Categoría</label><select id="ee-c"><option>Seguridad</option><option>Honorarios</option><option>Mantenimiento</option><option>Servicios</option><option>Limpieza</option><option>Otro</option></select></div>
+    <div class="fg"><label>Monto ($)</label><input type="number" id="ee-m" inputmode="numeric"></div>
+    <div class="fg"><label>Comprobante</label><input type="text" id="ee-cp"></div>
+    <div class="fg"><label>Link comprobante 1 (OneDrive/Drive)</label><input type="text" id="ee-link" placeholder="https://1drv.ms/..."></div>
+    <div class="fg"><label>Link comprobante 2 (OneDrive/Drive)</label><input type="text" id="ee-link2" placeholder="https://1drv.ms/..."></div>
+    <div class="fg"><label>Fecha</label><input type="text" id="ee-f"></div>
+    <div class="fg"><label>Estado</label><select id="ee-e"><option value="pagada">Pagada</option><option value="recibida">Recibida</option><option value="pendiente">Pendiente</option></select></div>
+    <button class="btn" id="btn-se2" onclick="guardarEgr()">✓ Guardar</button>
+    <button onclick="cerrar('mod-egr')" style="width:100%;margin-top:7px;padding:10px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer">Cancelar</button>
+  </div>
+</div>
+
+<!-- CONCILIACIÓN -->
+<div id="pnl-conc" class="pnl">
+  <div class="g2">
+    <div class="met"><div class="ml">Depósitos Lemon</div><div class="mv vd" id="cn-tot-lem" style="font-size:13px">—</div></div>
+    <div class="met"><div class="ml">App (transf.)</div><div class="mv vd" id="cn-tot-app" style="font-size:13px">—</div></div>
+    <div class="met"><div class="ml">✓ Coinciden</div><div class="mv vd" id="cn-ok">—</div></div>
+    <div class="met"><div class="ml">⚠️ Revisar</div><div class="mv rj" id="cn-diff">—</div></div>
+  </div>
+  <div id="lista-conc"><div class="empty">Cargando...</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:"AIzaSyCAHUPFjGYTh-r0zzjLcf1F4wunJ8C5RJI",
+  authDomain:"las-palmas-c793a.firebaseapp.com",
+  projectId:"las-palmas-c793a",
+  storageBucket:"las-palmas-c793a.firebasestorage.app",
+  messagingSenderId:"1091982866796",
+  appId:"1:1091982866796:web:60f162ce554518c2aedb49"
+});
+const db = getFirestore(app);
+
+const fa = n => '$' + Math.round(n).toLocaleString('es-AR');
+
+// ── USUARIOS ──
+const USUARIOS = {
+  'jponce':   {pass:'LasP2026jp', nombre:'Juan Luis Ponce', rol:'admin'},
+  'wvallejo': {pass:'LasP2026wv', nombre:'Walter Vallejo',  rol:'admin'},
+  'jvarvaro': {pass:'LasP2026jv', nombre:'Juana Varvaro',   rol:'admin'},
+  'spuertas': {pass:'LasP2026sp', nombre:'S. Puertas',      rol:'admin'},
+  'consulta': {pass:'LasP2026',   nombre:'Consulta',        rol:'consulta'},
+};
+let USER_ACTUAL = null;
+
+function aplicarModoConsulta(){
+  // Ocultar botones de acción
+  document.querySelectorAll('.btn.rj, .btn.az, #btn-reg, .btn-ed, .btn-dl, #btn-se, #btn-se2').forEach(el=>el.style.display='none');
+  // Ocultar formularios de carga
+  ['imp-file','btn-imp','btn-imp2','fg-lemon'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  // Ocultar tab actividad
+  document.querySelectorAll('.tab').forEach(t=>{ if(t.textContent.includes('Actividad')) t.style.display='none'; });
+  // Mostrar badge solo lectura
+  document.getElementById('hdr-user').textContent = '👁 Solo consulta';
+}
+
+window.doLogin = () => {
+  const u = document.getElementById('l-user').value.trim().toLowerCase();
+  const p = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('login-err');
+  if(USUARIOS[u] && USUARIOS[u].pass === p){
+    USER_ACTUAL = {id:u, nombre:USUARIOS[u].nombre, rol:USUARIOS[u].rol};
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
+    sessionStorage.setItem('lp_user', JSON.stringify(USER_ACTUAL));
+    errEl.style.display='none';
+    if(USER_ACTUAL.rol==='consulta'){
+      setTimeout(aplicarModoConsulta, 500);
+    } else {
+      registrarActividad('Ingresó al sistema');
+      listenActividad();
+    }
+  } else {
+    errEl.style.display='block';
+  }
+};
+
+window.cerrarSesion = () => {
+  if(!confirm('¿Cerrar sesión?')) return;
+  registrarActividad('Salió del sistema');
+  sessionStorage.removeItem('lp_user');
+  location.reload();
+};
+
+// Restaurar sesión si estaba logueado
+const _sess = sessionStorage.getItem('lp_user');
+if(_sess){
+  USER_ACTUAL = JSON.parse(_sess);
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
+  if(USER_ACTUAL.rol==='consulta') setTimeout(aplicarModoConsulta, 500);
+}
+
+// Presionar Enter en login
+document.getElementById('l-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window.doLogin(); });
+document.getElementById('l-user').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('l-pass').focus(); });
+
+// ── REGISTRO DE ACTIVIDAD ──
+async function registrarActividad(accion){
+  if(!USER_ACTUAL) return;
+  try {
+    await addDoc(collection(db,'actividad'),{
+      usuario: USER_ACTUAL.id,
+      nombre: USER_ACTUAL.nombre,
+      accion,
+      fecha: new Date().toISOString()
+    });
+  } catch(e){ console.error('Log error:',e); }
+}
+window.registrarActividad = registrarActividad;
+
+function listenActividad(){
+  onSnapshot(collection(db,'actividad'), snap=>{
+    const items = [];
+    snap.forEach(d=>items.push(d.data()));
+    items.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const el = document.getElementById('act-lista');
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<div class="empty">Sin actividad registrada</div>'; return; }
+    el.innerHTML = items.slice(0,100).map(i=>{
+      const f = new Date(i.fecha);
+      const fStr = f.toLocaleDateString('es-AR')+' '+f.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="log-item">
+        <div><span class="log-user">👤 ${i.nombre}</span> — ${i.accion}</div>
+        <div class="log-time">${fStr}</div>
+      </div>`;
+    }).join('');
+  });
+}
+
+// 84 lotes base
+const LB=[
+  {n:1,l:'L1 Sur',p:'Rodriguez Lilian Estela'},{n:2,l:'L2 Sur',p:'Albarracin German'},
+  {n:3,l:'L3 Sur',p:'Vallejo Walter Dario'},{n:4,l:'L4 Sur',p:'Juarez Martin'},
+  {n:5,l:'L5 Sur',p:'Ibanez Luciana'},{n:6,l:'L6 Sur',p:'Campos Fernando David'},
+  {n:7,l:'L7 Sur',p:'Ponce Juan Luis'},{n:8,l:'L8 Sur',p:'Ponce Juan Luis'},
+  {n:9,l:'L9 Sur',p:'Leal Hugo Daniel'},{n:10,l:'L10 Sur',p:'Salas Daniel'},
+  {n:11,l:'L11 Sur',p:'Varvaro Juana'},{n:12,l:'L12 Sur',p:'Aguirre Mauricio'},
+  {n:13,l:'L13 Sur',p:'Fernandez Carolina'},{n:14,l:'L14 Sur',p:'Herrera Luis'},
+  {n:15,l:'L15 Sur',p:'Rodriguez Matias'},{n:16,l:'L16 Sur',p:'Niz Marcelo'},
+  {n:17,l:'L17 Sur',p:'Veron Alejandro'},{n:18,l:'L18 Sur',p:'Maidana Enzo'},
+  {n:19,l:'L19 Sur',p:'Marazza Jose'},{n:20,l:'L20 Sur',p:'Ramos Fara Franco'},
+  {n:21,l:'L21 Sur',p:'Orieta Osvaldo'},{n:22,l:'L22 Sur',p:'Bollea Roxana'},
+  {n:23,l:'L23 Sur',p:'Leal Sebastian'},{n:24,l:'L24 Sur',p:'Lema Roberto'},
+  {n:25,l:'L25 Sur',p:'Espin Dora'},{n:26,l:'L26 Sur',p:'Bollea Roxana'},
+  {n:27,l:'L27 Sur',p:'Alderete Sergio'},{n:28,l:'L28 Sur',p:'Lane Brian'},
+  {n:29,l:'L29 Sur',p:'Medina Esteban'},{n:30,l:'L30 Sur',p:'Medina Esteban'},
+  {n:31,l:'L31 Sur',p:'De La Vega Rossana'},{n:32,l:'L32 Sur',p:'Carrizo Julio'},
+  {n:33,l:'L33 Sur',p:'Ramos Augusto'},{n:34,l:'L34 Sur',p:'Bazan Franco'},
+  {n:35,l:'L35 Sur',p:'Di Bello Gabriela'},{n:36,l:'L36 Sur',p:'Villagra Gustavo'},
+  {n:37,l:'L37 Sur',p:'Orieta Daniel'},{n:38,l:'L38 Sur',p:'Garcia Fernanda'},
+  {n:39,l:'L39 Sur',p:'Zelaya Hugo'},{n:40,l:'L40 Sur',p:'Zelaya Hernan Gabriel'},
+  {n:41,l:'L1 Norte',p:'Figueroa Jose Gustavo'},{n:42,l:'L2 Norte',p:'Padilla Maria Josefina'},
+  {n:43,l:'L3 Norte',p:'Orrego Oscar'},{n:44,l:'L4 Norte',p:'Lugones Sergio'},
+  {n:45,l:'L5 Norte',p:'Salva Gustavo'},{n:46,l:'L6 Norte',p:'Emge Martin'},
+  {n:47,l:'L7 Norte',p:'Robles Juan'},{n:48,l:'L8 Norte',p:'Romano Ramon'},
+  {n:49,l:'L9 Norte',p:'Soregaroli Eugenia'},{n:50,l:'L10 Norte',p:'Hernando Ezequiel'},
+  {n:51,l:'L11 Norte',p:'Mamani Julio'},{n:52,l:'L12 Norte',p:'Nina Juan Carlos'},
+  {n:53,l:'L13 Norte',p:'Egea Diego'},{n:54,l:'L14 Norte',p:'Basso Gabriela'},
+  {n:55,l:'L15 Norte',p:'Luna Osvaldo'},{n:56,l:'L16 Norte',p:'Santillan Cristian'},
+  {n:57,l:'L17 Norte',p:'Maidana Enzo'},{n:58,l:'L18 Norte',p:'Ponce Giselle'},
+  {n:59,l:'L19 Norte',p:'Pacheco Eliana'},{n:60,l:'L20 Norte',p:'Nadal Jose'},
+  {n:61,l:'L21 Norte',p:'Nader Carlos'},{n:62,l:'L22 Norte',p:'Ramos Eduardo'},
+  {n:63,l:'L23 Norte',p:'Luna Belen'},{n:64,l:'L24 Norte',p:'Gutierrez Jose'},
+  {n:65,l:'L25 Norte',p:'Sosa Cristian'},{n:66,l:'L26 Norte',p:'Rivero Belen'},
+  {n:67,l:'L27 Norte',p:'Catillo Cinthia'},{n:68,l:'L28 Norte',p:'Hermann Emge'},
+  {n:69,l:'L29 Norte',p:'Lema Karina'},{n:70,l:'L30 Norte',p:'Diaz Roxana'},
+  {n:71,l:'L31 Norte',p:'Olivera Silvana'},{n:72,l:'L32 Norte',p:'Olivera Silvana'},
+  {n:73,l:'L33 Norte',p:'Pedraza Elena'},{n:74,l:'L34 Norte',p:'Garcia Cote Viviana'},
+  {n:75,l:'L35 Norte',p:'Justiniano Natalia'},{n:76,l:'L36 Norte',p:'Morales Roberto'},
+  {n:77,l:'L38 Norte',p:'Campero Liliana'},{n:78,l:'L37 Norte',p:'Bautista Luis'},
+  {n:79,l:'L39 Norte',p:'Acuna Jose'},{n:80,l:'L40 Norte',p:'Morales Roberto'},
+  {n:81,l:'L41 Norte',p:'Zubelsa Walter'},{n:82,l:'L42 Norte',p:'Marazza Jose'},
+  {n:83,l:'L43 Norte',p:'Marazza Jose'},{n:84,l:'L44 Norte',p:'Szmyd Damian'},
+];
+
+// DEU: deuda capital por lote según rendición al 31/05/2026
+// Ordinaria: oe=ene ob=feb or=mar oa=abr oy=may  (venc 15 de cada mes)
+// Extraordinaria: xr=mar xa=abr xy=may
+// Columnas del PDF pág4 (ord): ene | feb | mar | abr | may
+// Columnas del PDF pág5 (ext): mar | abr  (solo esas dos columnas)
+const DEU=[
+  // --- SUR ---
+  {l:'L4 Sur',  p:'Juarez Martin',         oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:973,   xy:95000},
+  {l:'L5 Sur',  p:'Ibanez Luciana',         oe:0,     ob:0,     or:0,     oa:0,     oy:46800, xr:0,     xa:0,     xy:95000},
+  {l:'L6 Sur',  p:'Campos Fernando David',  oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L9 Sur',  p:'Leal Hugo Daniel',       oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L16 Sur', p:'Niz Marcelo',            oe:70000, ob:70000, or:70000, oa:90000, oy:0,     xr:95000, xa:95000, xy:0},
+  {l:'L17 Sur', p:'Veron Alejandro',        oe:0,     ob:0,     or:0,     oa:0,     oy:800,   xr:0,     xa:0,     xy:95000},
+  {l:'L21 Sur', p:'Orieta Osvaldo',          oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:45000, xy:95000},
+  {l:'L22 Sur', p:'Bollea Roxana',          oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:45000, xy:95000},
+  {l:'L26 Sur', p:'Bollea Roxana',          oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L28 Sur', p:'Lane Brian',             oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:8800,  xy:95000},
+  {l:'L31 Sur', p:'De La Vega Rossana',     oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:95000},
+  {l:'L32 Sur', p:'Carrizo Julio',          oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L33 Sur', p:'Ramos Augusto',          oe:0,     ob:0,     or:1493,  oa:0,     oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L35 Sur', p:'Di Bello Gabriela',      oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L36 Sur', p:'Villagra Gustavo',       oe:0,     ob:0,     or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L37 Sur', p:'Orieta Daniel',          oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L38 Sur', p:'Garcia Fernanda',        oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L39 Sur', p:'Zelaya Hugo',            oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L40 Sur', p:'Zelaya Hernan Gabriel',  oe:0,     ob:70000, or:70000, oa:70000, oy:90000, xr:0,     xa:90000, xy:95000},
+  // --- NORTE ---
+  {l:'L1 Norte',p:'Figueroa Jose Gustavo',  oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:95000},
+  {l:'L2 Norte',p:'Padilla Maria Josefina', oe:0,     ob:0,     or:0,     oa:560,   oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L7 Norte',p:'Robles Juan',            oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L9 Norte',p:'Soregaroli Eugenia',     oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:73800},
+  {l:'L11 Norte',p:'Mamani Julio',          oe:0,     ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L12 Norte',p:'Nina Juan Carlos',      oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:73800},
+  {l:'L13 Norte',p:'Egea Diego',            oe:0,     ob:0,     or:12000, oa:0,     oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L14 Norte',p:'Basso Gabriela',        oe:0,     ob:0,     or:47802, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L16 Norte',p:'Santillan Cristian',    oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:95000},
+  {l:'L18 Norte',p:'Ponce Giselle',         oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:11152},
+  {l:'L19 Norte',p:'Pacheco Eliana',        oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L20 Norte',p:'Nadal Jose',            oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L21 Norte',p:'Nader Carlos',          oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L22 Norte',p:'Ramos Eduardo',         oe:0,     ob:0,     or:0,     oa:0,     oy:3800,  xr:0,     xa:0,     xy:95000},
+  {l:'L23 Norte',p:'Luna Belen',            oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L26 Norte',p:'Rivero Belen',          oe:45653, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L27 Norte',p:'Catillo Cinthia',       oe:70000, ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L28 Norte',p:'Hermann Emge',          oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L30 Norte',p:'Diaz Roxana',           oe:0,     ob:0,     or:0,     oa:17200, oy:90000, xr:0,     xa:1400,  xy:95000},
+  {l:'L31 Norte',p:'Olivera Silvana',       oe:0,     ob:0,     or:0,     oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L32 Norte',p:'Olivera Silvana',       oe:0,     ob:0,     or:0,     oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L33 Norte',p:'Pedraza Elena',         oe:0,     ob:0,     or:0,     oa:0,     oy:90000, xr:0,     xa:0,     xy:95000},
+  {l:'L34 Norte',p:'Garcia Cote Viviana',   oe:0,     ob:0,     or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L36 Norte',p:'Morales Roberto',       oe:0,     ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L38 Norte',p:'Campero Liliana',       oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:95000},
+  {l:'L39 Norte',p:'Acuna Jose',            oe:0,     ob:0,     or:0,     oa:0,     oy:0,     xr:0,     xa:0,     xy:95000},
+  {l:'L40 Norte',p:'Morales Roberto',       oe:0,     ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L41 Norte',p:'Zubelsa Walter',        oe:0,     ob:70000, or:70000, oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+  {l:'L44 Norte',p:'Szmyd Damian',          oe:0,     ob:0,     or:0,     oa:90000, oy:90000, xr:0,     xa:95000, xy:95000},
+];
+
+// Agregar deuda junio 2026 a todos los lotes
+DEU.forEach(d => { d.ju_ord = 90000; d.ju_ext = 95000; });
+
+// Estado global - COBROS como array simple
+let MES = '2026-05';
+let MES_NOM = 'Mayo 2026';
+let COBROS = []; // Array plano de todos los cobros del mes activo
+let TODOS_COBROS = []; // Cobros de todos los meses (para calcDeudaEfectiva)
+let EGRESOS = [];
+let _unsubC = null, _unsubE = null;
+let filtL = '', filtR = '';
+let _editCobId = null, _editCobN = null;
+let _editEgrId = null;
+
+// Toast
+function toast(msg, dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function setDot(ok){ document.getElementById('dot').className='dot'+(ok?' ok':''); }
+
+// Tabs
+window.ST = (n,el)=>{
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pnl-'+n).classList.add('on');
+  if(n==='rec') poblarRS();
+  if(n==='rend') renderRend();
+  if(n==='conc') renderConc();
+};
+
+window.cerrar = id => document.getElementById(id).style.display='none';
+
+// Cambiar mes
+window.cambiarMes = val => {
+  if(_unsubC){ _unsubC(); _unsubC=null; }
+  if(_unsubE){ _unsubE(); _unsubE=null; }
+  MES = val;
+  MES_NOM = {
+    '2026-05':'Mayo 2026',
+    '2026-06':'Junio 2026', 
+    '2026-07':'Julio 2026'
+  }[val] || val;
+  document.getElementById('hdr-p').textContent = 'Cobranzas ' + MES_NOM;
+  document.getElementById('rend-tit').textContent = 'Rendición — ' + MES_NOM;
+  COBROS = []; EGRESOS = [];
+  renderCob(); renderRend(); renderEgr(); actualizarEstado();
+  setDot(false);
+  listenCobros();
+  listenEgresos();
+  toast('📅 ' + MES_NOM);
+};
+
+// FIREBASE LISTENERS
+function colC(){ return 'C_' + MES.replace('-',''); }
+function colE(){ return 'E_' + MES.replace('-',''); }
+
+// Cargar cobros de todos los meses para calcDeudaEfectiva
+async function cargarTodosCobros(){
+  const meses = ['C_202601','C_202602','C_202603','C_202604','C_202605','C_202606','C_202607'];
+  TODOS_COBROS = [];
+  for(const col of meses){
+    try {
+      const snap = await getDocs(collection(db, col));
+      snap.forEach(d=>{ TODOS_COBROS.push({...d.data(), _id:d.id}); });
+    } catch(e){ /* mes sin datos */ }
+  }
+  renderDeu();
+}
+
+function listenCobros(){
+  if(_unsubC){ _unsubC(); _unsubC=null; }
+  const col = colC();
+  console.log('listenCobros col:', col);
+  setDot(null); // gris = conectando
+  _unsubC = onSnapshot(collection(db, col), snap=>{
+    console.log('snapshot cobros:', snap.size, 'docs');
+    COBROS = [];
+    snap.forEach(d=>{ COBROS.push({...d.data(), _id:d.id}); });
+    renderCob();
+    renderRend();
+    poblarRS();
+    actualizarEstado();
+    renderConc();
+    cargarTodosCobros();
+    // Auto-numerar recibo
+    const nums = COBROS.map(c=>parseInt(c.recibo)).filter(n=>!isNaN(n));
+    const next = nums.length ? Math.max(...nums)+1 : 376;
+    const irEl = document.getElementById('ir');
+    if(irEl) irEl.placeholder = next;
+    setDot(true);
+  }, err=>{
+    console.error('Firebase error:', err);
+    toast('❌ Firebase: ' + err.message);
+    setDot(false);
+  });
+}
+
+function listenEgresos(){
+  if(_unsubE){ _unsubE(); _unsubE=null; }
+  const col = colE();
+  _unsubE = onSnapshot(collection(db, col), snap=>{
+    EGRESOS = [];
+    snap.forEach(d=>{ EGRESOS.push({...d.data(), _id:d.id}); });
+    renderEgr();
+    actualizarEstado();
+  });
+}
+
+// COBRANZAS
+window.filtrarL = v => { filtL=v.toLowerCase(); renderCob(); };
+
+function renderCob(){
+  const vis = LB.filter(b=>!filtL||b.l.toLowerCase().includes(filtL)||b.p.toLowerCase().includes(filtL));
+  const cobPorLote = {};
+  COBROS.forEach(c=>{ const k=parseInt(c.n); if(!cobPorLote[k]) cobPorLote[k]=[]; cobPorLote[k].push(c); });
+  
+  const pag = Object.keys(cobPorLote).length;
+  const tot = COBROS.reduce((s,c)=>s+c.monto,0);
+  const pct = Math.round(pag/84*100);
+  document.getElementById('m-pag').textContent=pag;
+  document.getElementById('m-pen').textContent=84-pag;
+  document.getElementById('m-tot').textContent=fa(tot);
+  document.getElementById('m-pct').textContent=pct+'%';
+  document.getElementById('prog').style.width=pct+'%';
+  document.getElementById('prog-t').textContent=pag+' de 84 lotes con cobros';
+
+  document.getElementById('lista-cob').innerHTML = vis.map(b=>{
+    const cobs = cobPorLote[b.n]||[];
+    const ok = cobs.length>0;
+    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+c.monto,0);
+    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
+    const conceptos=[
+      ord?`<span style="color:#1565c0;font-size:11px">Ord: ${fa(ord)}</span>`:'',
+      ext?`<span style="color:#1a7a4a;font-size:11px">Ext: ${fa(ext)}</span>`:'',
+      car?`<span style="color:#e65100;font-size:11px">Cargo: ${fa(car)}</span>`:'',
+    ].filter(Boolean).join('&nbsp;&nbsp;');
+    const btns=cobs.map(c=>`<button class="btn-sm btn-ed" onclick="abrirEditCob(${b.n},'${c._id}')" title="${tipoL(c.conc)}">✏️</button><button class="btn-sm btn-dl" onclick="elimCob('${c._id}')">🗑</button>`).join(' ');
+    return `<div class="lc ${ok?'pag':'pen'}">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name">${b.l}&nbsp;&nbsp;<span style="font-weight:400">${b.p}</span></div>
+          <div class="lc-sub">${ok?conceptos:'<span style="color:#e53935">Sin cobros</span>'}</div>
+        </div>
+        <div style="text-align:right">
+          ${ok?`<div class="lc-monto" style="color:#1a7a4a">${fa(cobs.reduce((s,c)=>s+c.monto,0))}</div>`:'<div class="lc-monto" style="color:#ccc;font-size:12px">—</div>'}
+        </div>
+      </div>
+      ${ok?`<div class="lc-btns">${btns}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function tipoL(t){ return t==='ordinaria'?'Exp. Ordinaria':t==='extraordinaria'?'Exp. Extraordinaria':'Cargo'; }
+
+// Poblar select lotes
+function poblarSL(){
+  const s=document.getElementById('sl'); s.innerHTML='';
+  LB.forEach(b=>{ const o=document.createElement('option'); o.value=b.n; o.textContent=b.l+' — '+b.p; s.appendChild(o); });
+}
+
+// Registrar cobro
+window.toggleLemon = v => {
+  document.getElementById('fg-lemon').style.display = v==='Transferencia'?'block':'none';
+};
+
+window.registrar = async () => {
+  const btn=document.getElementById('btn-reg');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try {
+    const n = parseInt(document.getElementById('sl').value);
+    const monto = parseInt(document.getElementById('im').value)||0;
+    const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value);
+    const cobro = {
+      n,
+      conc: document.getElementById('sc').value,
+      per,
+      monto,
+      forma: document.getElementById('sf').value,
+      recibo: document.getElementById('ir').value||'—',
+      fecha: document.getElementById('id').value||'',
+      lemon: document.getElementById('ilemon').value.trim()||'',
+      obs: document.getElementById('iob').value||''
+    };
+    await addDoc(collection(db, colC()), cobro);
+
+    // renderDeu cruza con COBROS en tiempo real, no hace falta modificar DEU[]
+    const loteInfo = LB.find(x=>x.n===n);
+    toast(`✅ Cobro registrado · ${loteInfo?loteInfo.l:''}`);
+    registrarActividad(`Registró cobro: ${loteInfo?loteInfo.l+' - '+loteInfo.p:''} · ${fa(monto)} · ${cobro.conc} · ${per}`);
+    ['im','iob','ilemon'].forEach(id=>document.getElementById(id).value='');
+    document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
+    document.getElementById('ir').value='';
+  } catch(e){ toast('❌ Error: '+e.message); }
+  btn.disabled=false; btn.textContent='✓ Registrar cobro';
+};
+
+// Importar JSON
+window.importar = async () => {
+  const fileEl = document.getElementById('imp-file');
+  if(!fileEl.files||!fileEl.files[0]){ toast('⚠️ Seleccioná un archivo JSON'); return; }
+  const file = fileEl.files[0];
+  toast('⏳ Leyendo archivo...');
+  try {
+    const data = JSON.parse(await file.text());
+    const items = data.cobros||data.pagos||[];
+    if(!items.length){ toast('❌ Sin cobros en el archivo'); return; }
+    toast('⏳ Importando '+items.length+' cobros...');
+    let ok=0,err=0;
+    for(const c of items){
+      try {
+        await addDoc(collection(db, colC()), {
+          n: parseInt(c.n),
+          conc: c.conc||'ordinaria',
+          monto: parseInt(c.monto)||0,
+          forma: c.forma||'Efectivo',
+          recibo: c.recibo||'—',
+          fecha: c.fecha||'',
+          transf: c.transf||'',
+          obs: c.obs||''
+        });
+        ok++;
+      } catch(e){ err++; console.error('Error cobro:',e,c); }
+    }
+    toast('✅ '+ok+' cobros importados'+(err?' ('+err+' errores)':''));
+  } catch(e){ toast('❌ Error: '+e.message); console.error(e); }
+};
+
+// Limpiar mes
+window.limpiar = async () => {
+  if(!confirm('¿Eliminar TODOS los cobros de '+MES_NOM+'?')) return;
+  toast('⏳ Limpiando...');
+  try {
+    const snap = await getDocs(collection(db, colC()));
+    for(const d of snap.docs) await deleteDoc(doc(db, colC(), d.id));
+    toast('🗑 '+snap.size+' cobros eliminados de '+MES_NOM);
+  } catch(e){ toast('❌ Error: '+e.message); }
+};
+
+// Editar cobro
+window.abrirEditCob = (n,id) => {
+  const c = COBROS.find(x=>x._id===id);
+  if(!c) return;
+  const b = LB.find(x=>x.n===n);
+  _editCobId=id; _editCobN=n;
+  document.getElementById('mod-info').textContent=b.l+' — '+b.p;
+  document.getElementById('me-c').value=c.conc||'ordinaria';
+  // Marcar checkboxes del modal según períodos guardados
+  const peres = Array.isArray(c.per) ? c.per : (c.per ? [c.per] : ['otro']);
+  document.querySelectorAll('input[name="me-per"]').forEach(cb=>{
+    cb.checked = peres.includes(cb.value);
+  });
+  document.getElementById('me-m').value=c.monto||'';
+  document.getElementById('me-f').value=c.forma||'Efectivo';
+  document.getElementById('me-r').value=c.recibo||'';
+  document.getElementById('me-d').value=c.fecha||'';
+  document.getElementById('me-t').value=c.transf||'';
+  document.getElementById('me-o').value=c.obs||'';
+  document.getElementById('mod-cob').style.display='block';
+};
+
+window.guardarCobro = async () => {
+  if(!_editCobId) return;
+  const btn=document.getElementById('btn-se');
+  btn.disabled=true; btn.textContent='Guardando...';
+  try {
+    await setDoc(doc(db,colC(),_editCobId),{
+      n:_editCobN,
+      conc:document.getElementById('me-c').value,
+      per: Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value),
+      monto:parseInt(document.getElementById('me-m').value)||0,
+      forma:document.getElementById('me-f').value,
+      recibo:document.getElementById('me-r').value||'—',
+      fecha:document.getElementById('me-d').value||'',
+      transf:document.getElementById('me-t').value||'',
+      obs:document.getElementById('me-o').value||''
+    });
+    toast('✅ Cobro actualizado'); cerrar('mod-cob');
+    registrarActividad(`Editó cobro: Lote ${_editCobN} · ${fa(parseInt(document.getElementById('me-m').value)||0)}`);
+  } catch(e){ toast('❌ Error'); }
+  btn.disabled=false; btn.textContent='✓ Guardar';
+};
+
+window.elimCob = async id => {
+  if(!confirm('¿Eliminar este cobro?')) return;
+  try {
+    const c = COBROS.find(x=>x._id===id);
+    const b = c ? LB.find(x=>x.n===parseInt(c.n)) : null;
+    await deleteDoc(doc(db,colC(),id));
+    registrarActividad(`Eliminó cobro: ${b?b.l+' - '+b.p:id}`);
+    toast('🗑 Cobro eliminado');
+  }
+  catch(e){ toast('❌ Error'); }
+};
+
+// RENDICION
+window.filtrarR = v => { filtR=v.toLowerCase(); renderRend(); };
+
+function renderRend(){
+  // Agrupar COBROS por lote
+  const porLote = {};
+  COBROS.forEach(c=>{
+    const n = parseInt(c.n);
+    if(!porLote[n]) porLote[n]=[];
+    porLote[n].push(c);
+  });
+
+  let rows='', sO=0,sE=0,sC=0,sT=0;
+  
+  // Ordenar por número de lote
+  Object.keys(porLote).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(key=>{
+    const n=parseInt(key);
+    const b=LB.find(x=>x.n===n);
+    if(!b) return;
+    if(filtR && !b.l.toLowerCase().includes(filtR) && !b.p.toLowerCase().includes(filtR)) return;
+    const cobs=porLote[n];
+    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+c.monto,0);
+    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
+    const tot=ord+ext+car;
+    sO+=ord;sE+=ext;sC+=car;sT+=tot;
+    const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
+    const fecha=cobs[0].fecha||'—';
+    rows+=`<tr style="border-bottom:.5px solid #f0f0f0">
+      <td style="padding:5px 4px;font-size:10px">${b.n}</td>
+      <td style="padding:5px 4px"><span style="font-size:10px;font-weight:700;color:#14603a;background:#e8f5ee;padding:1px 5px;border-radius:4px">${b.l}</span></td>
+      <td style="padding:5px 4px;font-size:11px;font-weight:600">${b.p}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${ord?700:400};color:${ord?'#1565c0':'#ccc'}">${ord?fa(ord):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${ext?700:400};color:${ext?'#1a7a4a':'#ccc'}">${ext?fa(ext):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${car?700:400};color:${car?'#e65100':'#ccc'}">${car?fa(car):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${recs}</td>
+      <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${fecha}</td>
+      <td class="num" style="padding:5px 4px;font-weight:700;color:#1a7a4a;font-size:12px">${fa(tot)}</td>
+    </tr>`;
+  });
+
+  document.getElementById('tb-rend').innerHTML = rows||`<tr><td colspan="9" style="text-align:center;color:#aaa;padding:16px">Sin cobros en ${MES_NOM}</td></tr>`;
+  document.getElementById('tf-rend').innerHTML=`<tr style="background:#f5f5f5;font-weight:700;font-size:11px">
+    <td colspan="3" style="padding:6px 4px">Total</td>
+    <td class="num" style="padding:6px 4px;color:#1565c0">${sO?fa(sO):'—'}</td>
+    <td class="num" style="padding:6px 4px;color:#1a7a4a">${sE?fa(sE):'—'}</td>
+    <td class="num" style="padding:6px 4px;color:#e65100">${sC?fa(sC):'—'}</td>
+    <td colspan="2"></td>
+    <td class="num" style="padding:6px 4px;color:#1a7a4a">${fa(sT)}</td>
+  </tr>`;
+}
+
+// EGRESOS
+function renderEgr(){
+  const tot=EGRESOS.reduce((s,e)=>s+e.m,0);
+  document.getElementById('eg-tot').textContent=fa(tot);
+  document.getElementById('eg-cnt').textContent=EGRESOS.length;
+  document.getElementById('lista-egr').innerHTML=EGRESOS.length?EGRESOS.map(e=>`
+    <div class="lc pag" style="border-left-color:#e53935">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name">${e.d}</div>
+          <div class="lc-sub"><span>${e.cat}</span><span>${e.cp||'—'}</span><span>${e.f||'—'}</span><span style="color:${e.e==='pagada'?'#1a7a4a':e.e==='pendiente'?'#e53935':'#888'}">${e.e}</span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="lc-monto" style="color:#e53935">${fa(e.m)}</div>
+          <div class="lc-btns" style="justify-content:flex-end;margin-top:4px">
+            ${e.link?`<a href="${e.link}" target="_blank" class="btn-sm" style="text-decoration:none;background:#e8f5ee;border-color:#1a7a4a;color:#1a7a4a">📎 Ver 1</a>`:''}
+            ${e.link2?`<a href="${e.link2}" target="_blank" class="btn-sm" style="text-decoration:none;background:#e8f5ee;border-color:#1a7a4a;color:#1a7a4a">📎 Ver 2</a>`:''}
+            <button class="btn-sm btn-ed" onclick="abrirEditEgr('${e._id}')">✏️</button>
+            <button class="btn-sm btn-dl" onclick="elimEgr('${e._id}')">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join(''):'<div class="empty">Sin egresos</div>';
+}
+
+
+window.importarEgr = async () => {
+  const fileEl = document.getElementById('imp-egr-file');
+  if(!fileEl.files||!fileEl.files[0]){ toast('⚠️ Seleccioná un archivo JSON'); return; }
+  const file = fileEl.files[0];
+  toast('⏳ Leyendo archivo...');
+  try {
+    const data = JSON.parse(await file.text());
+    const items = data.egresos||[];
+    if(!items.length){ toast('❌ Sin egresos en el archivo'); return; }
+    toast('⏳ Importando '+items.length+' egresos...');
+    let ok=0,err=0;
+    for(const e of items){
+      try {
+        await addDoc(collection(db, colE()), {
+          d: e.d||'',
+          cat: e.cat||'Otro',
+          m: parseInt(e.m)||0,
+          cp: e.cp||'—',
+          f: e.f||'',
+          e: e.e||'pagada'
+        });
+        ok++;
+      } catch(ex){ err++; console.error(ex); }
+    }
+    toast('✅ '+ok+' egresos importados'+(err?' ('+err+' errores)':''));
+  } catch(e){ toast('❌ Error: '+e.message); }
+};
+
+window.addEgr = async () => {
+  const d=document.getElementById('ed').value.trim(); if(!d) return;
+  try {
+    await addDoc(collection(db,colE()),{
+      d, cat:document.getElementById('ec').value,
+      m:parseInt(document.getElementById('em').value)||0,
+      cp:document.getElementById('ecp').value||'—',
+      f:document.getElementById('ef').value,
+      e:document.getElementById('ee').value,
+      link:document.getElementById('elink').value.trim()||'',
+      link2:document.getElementById('elink2').value.trim()||''
+    });
+    document.getElementById('ed').value=''; document.getElementById('em').value=''; document.getElementById('elink').value=''; document.getElementById('elink2').value='';
+    toast('✅ Egreso guardado');
+    registrarActividad(`Agregó egreso: ${d} · ${fa(parseInt(document.getElementById('em').value)||0)}`);
+  } catch(e){ toast('❌ Error'); }
+};
+
+window.abrirEditEgr = id => {
+  const e=EGRESOS.find(x=>x._id===id); if(!e) return;
+  _editEgrId=id;
+  document.getElementById('ee-d').value=e.d||'';
+  document.getElementById('ee-c').value=e.cat||'Seguridad';
+  document.getElementById('ee-m').value=e.m||'';
+  document.getElementById('ee-cp').value=e.cp||'';
+  document.getElementById('ee-link').value=e.link||'';
+  document.getElementById('ee-link2').value=e.link2||'';
+  document.getElementById('ee-f').value=e.f||'';
+  document.getElementById('ee-e').value=e.e||'pagada';
+  document.getElementById('mod-egr').style.display='block';
+};
+
+window.guardarEgr = async () => {
+  if(!_editEgrId) return;
+  const btn=document.getElementById('btn-se2'); btn.disabled=true;
+  try {
+    await setDoc(doc(db,colE(),_editEgrId),{
+      d:document.getElementById('ee-d').value,
+      cat:document.getElementById('ee-c').value,
+      m:parseInt(document.getElementById('ee-m').value)||0,
+      cp:document.getElementById('ee-cp').value||'—',
+      f:document.getElementById('ee-f').value,
+      e:document.getElementById('ee-e').value,
+      link:document.getElementById('ee-link').value.trim()||'',
+      link2:document.getElementById('ee-link2').value.trim()||''
+    });
+    toast('✅ Egreso actualizado'); cerrar('mod-egr');
+    registrarActividad(`Editó egreso: ${document.getElementById('ee-d').value} · ${fa(parseInt(document.getElementById('ee-m').value)||0)}`);
+  } catch(e){ toast('❌ Error'); }
+  btn.disabled=false;
+};
+
+window.elimEgr = async id => {
+  if(!confirm('¿Eliminar este egreso?')) return;
+  try {
+    const eg = EGRESOS.find(x=>x._id===id);
+    await deleteDoc(doc(db,colE(),id));
+    registrarActividad(`Eliminó egreso: ${eg?eg.d:id}`);
+    toast('🗑 Eliminado');
+  }
+  catch(e){ toast('❌ Error'); }
+};
+
+// DEUDORES — cruza DEU[] con COBROS reales de Firebase
+function calcDeudaEfectiva(d){
+  const loteInfo = LB.find(x=>x.l===d.l);
+  if(!loteInfo) return {...d};
+  // Usar todos los cobros históricos para descontar deuda
+  const src = TODOS_COBROS.length > 0 ? TODOS_COBROS : COBROS;
+  const cobrosLote = src.filter(c=>parseInt(c.n)===loteInfo.n);
+  const pagadoPor = {};
+  cobrosLote.forEach(c=>{
+    // per puede ser string (legacy) o array (nuevo)
+    const peres = Array.isArray(c.per) ? c.per : (c.per ? [c.per] : []);
+    peres.forEach(p=>{
+      if(p && p!=='otro'){
+        pagadoPor[p] = (pagadoPor[p]||0) + (c.monto||0);
+      }
+    });
+  });
+  const r = {...d};
+  ['oe','ob','or','oa','oy','ju_ord','xr','xa','xy','ju_ext'].forEach(campo=>{
+    if(pagadoPor[campo]!==undefined){
+      r[campo] = Math.max(0, (r[campo]||0) - pagadoPor[campo]);
+    }
+  });
+  return r;
+}
+
+function renderDeu(){
+  const DEU_EF = DEU.map(d => calcDeudaEfectiva(d));
+  document.getElementById('lista-deu').innerHTML=DEU_EF.map(d=>{
+    const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
+    const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    const totGen=totOrd+totExt;
+    if(!totGen) return'';
+    const msMax=mesesDeuda(d);
+    const col=msMax>=3?'#e53935':msMax===2?'#f57c00':'#1a7a4a';
+    const badge=msMax>=3
+      ?`<span style="background:#fdecea;color:#c62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 ${msMax} meses</span>`
+      :msMax===2
+      ?`<span style="background:#fff8e1;color:#e65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🟠 2 meses</span>`
+      :`<span style="background:#e8f5ee;color:#1a7a4a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🟢 1 mes</span>`;
+    return`<div class="lc pen" style="border-left-color:${col};margin-bottom:8px">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${d.l}&nbsp;&nbsp;<span style="font-weight:400">${d.p}</span>${badge}</div>
+          <div class="lc-sub" style="margin-top:4px">
+            ${d.oe?`<span style="color:#1565c0">Ene ord: ${fa(d.oe)}</span>`:''}${d.ob?`<span style="color:#1565c0">Feb ord: ${fa(d.ob)}</span>`:''}
+            ${d.or?`<span style="color:#1565c0">Mar ord: ${fa(d.or)}</span>`:''}${d.oa?`<span style="color:#1565c0">Abr ord: ${fa(d.oa)}</span>`:''}
+            ${d.oy?`<span style="color:#1565c0">May ord: ${fa(d.oy)}</span>`:''}
+            ${d.xr?`<span style="color:#1a7a4a">Mar ext: ${fa(d.xr)}</span>`:''}${d.xa?`<span style="color:#1a7a4a">Abr ext: ${fa(d.xa)}</span>`:''}
+            ${d.xy?`<span style="color:#1a7a4a">May ext: ${fa(d.xy)}</span>`:''}
+            ${d.ju_ord?`<span style="color:#1565c0">Jun ord: ${fa(d.ju_ord)}</span>`:''}
+            ${d.ju_ext?`<span style="color:#1a7a4a">Jun ext: ${fa(d.ju_ext)}</span>`:''}
+          </div>
+        </div>
+        <div style="text-align:right;margin-left:8px">
+          <span class="lc-monto" style="color:${col};display:block">${fa(totGen)}</span>
+          <span style="font-size:10px;color:#aaa">Total capital</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#f9f9f9;border-radius:8px;padding:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="color:#1565c0;font-weight:600">Capital ordinario</span>
+          <span style="font-weight:700">${fa(totOrd)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="color:#1a7a4a;font-weight:600">Capital extraordinario</span>
+          <span style="font-weight:700">${fa(totExt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;border-top:1px solid #eee;padding-top:6px;margin-top:2px">
+          <span>Total capital</span>
+          <span style="color:${col}">${fa(totGen)}</span>
+        </div>
+      </div>
+      <button onclick="enviarWsp('${d.l}','${d.p}',${totOrd},${totExt},${totGen},'${msMax}')" style="margin-top:8px;width:100%;padding:9px;background:#25d366;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📱 Enviar aviso por WhatsApp</button>
+    </div>`;
+  }).join('');
+
+  // Totales generales con deuda efectiva
+  const totOrdGen = DEU_EF.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0),0);
+  const totExtGen = DEU_EF.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0),0);
+  document.getElementById('deu-tot-ord').textContent = fa(totOrdGen);
+  document.getElementById('deu-tot-ext').textContent = fa(totExtGen);
+  document.getElementById('deu-tot-gen').textContent = fa(totOrdGen+totExtGen);
+  renderAlertas(DEU_EF);
+}
+
+// WHATSAPP DEUDORES
+window.enviarWsp = (lote, prop, totOrd, totExt, totGen, meses) => {
+  const hoy = new Date().toLocaleDateString('es-AR');
+  const mesesNum = parseInt(meses);
+  let msg = '';
+
+  if(mesesNum >= 3){
+    // Mensaje firme - 3+ meses
+    msg =
+`🏘 *Consorcio Barrio Las Palmas*
+📍 William Cross 3302
+
+Estimado/a *${prop}* (${lote}):
+
+Le informamos que registra una deuda de *${mesesNum} meses* de expensas impagas al ${hoy}:
+
+${totOrd>0?`📌 Expensas ordinarias: *${fa(totOrd)}*\n`:''}${totExt>0?`📌 Expensas extraordinarias: *${fa(totExt)}*\n`:''}
+💰 *Total capital: ${fa(totGen)}*
+
+⚠️ Le recordamos que según el Art. 8 del Reglamento de Copropiedad, las expensas impagas generan un interés punitorio del *4% mensual* desde el día 15 de cada mes vencido, pudiendo derivar en acciones legales de cobro.
+
+Le solicitamos regularizar su situación a la brevedad comunicándose con la administración.
+
+_Los montos informados están sujetos a verificación._
+
+Administración Barrio Las Palmas
+Juan Ponce / Walter Vallejo
+CPN Juana B. Varvaro · M.P 7450`;
+  } else {
+    // Mensaje suave - 2 meses
+    msg =
+`🏘 *Consorcio Barrio Las Palmas*
+📍 William Cross 3302
+
+Estimado/a *${prop}* (${lote}):
+
+Le recordamos que registra expensas pendientes de pago al ${hoy}:
+
+${totOrd>0?`📌 Expensas ordinarias: *${fa(totOrd)}*\n`:''}${totExt>0?`📌 Expensas extraordinarias: *${fa(totExt)}*\n`:''}
+💰 *Total capital: ${fa(totGen)}*
+
+Le pedimos que regularice su situación a la brevedad para evitar el devengamiento de intereses punitorios (Art. 8 Reglamento · 4% mensual).
+
+Ante cualquier consulta no dude en comunicarse con la administración.
+
+_Los montos informados están sujetos a verificación._
+
+Administración Barrio Las Palmas
+Juan Ponce / Walter Vallejo
+CPN Juana B. Varvaro · M.P 7450`;
+  }
+
+  const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+};
+
+function mesesDeuda(d){
+  // Cuenta cuántos meses distintos tiene deuda (ordinaria O extraordinaria)
+  let count = 0;
+  if(d.oe||0) count++;
+  if(d.ob||0) count++;
+  if((d.or||0)||(d.xr||0)) count++;
+  if((d.oa||0)||(d.xa||0)) count++;
+  if((d.oy||0)||(d.xy||0)) count++;
+  if((d.ju_ord||0)||(d.ju_ext||0)) count++;
+  return count;
+}
+
+function renderAlertas(DEU_EF){
+  // Usar deuda efectiva (ya descontados los cobros del mes)
+  const src = DEU_EF || DEU;
+  const criticos = src.filter(d=>{
+    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    return totGen>0 && mesesDeuda(d) >= 3;
+  });
+  const atencion = src.filter(d=>{
+    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    return totGen>0 && mesesDeuda(d) === 2;
+  });
+
+  let html = '';
+
+  if(criticos.length){
+    html += `<div style="background:#fdecea;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:8px">🔴 Aviso firme — 3 o más meses de deuda (${criticos.length} lotes)</div>`;
+    criticos.forEach(d=>{
+      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
+      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+      const totGen=totOrd+totExt;
+      const ms=mesesDeuda(d);
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #f5c6cb">
+        <div>
+          <div style="font-size:12px;font-weight:700">${d.l} — ${d.p}</div>
+          <div style="font-size:11px;color:#888">Deuda: ${fa(totGen)} · ${ms} meses</div>
+        </div>
+        <button onclick="enviarWsp('${d.l}','${d.p}',${totOrd},${totExt},${totGen},'${ms}')" style="padding:6px 12px;background:#25d366;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📱 Avisar</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if(atencion.length){
+    html += `<div style="background:#fff8e1;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:8px">🟠 Recordatorio — 2 meses de deuda (${atencion.length} lotes)</div>`;
+    atencion.forEach(d=>{
+      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
+      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+      const totGen=totOrd+totExt;
+      const ms=mesesDeuda(d);
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #ffe0b2">
+        <div>
+          <div style="font-size:12px;font-weight:700">${d.l} — ${d.p}</div>
+          <div style="font-size:11px;color:#888">Deuda: ${fa(totGen)} · ${ms} meses</div>
+        </div>
+        <button onclick="enviarWsp('${d.l}','${d.p}',${totOrd},${totExt},${totGen},'${ms}')" style="padding:6px 12px;background:#25d366;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📱 Avisar</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if(!criticos.length && !atencion.length){
+    html = `<div class="empty">✅ Sin alertas pendientes</div>`;
+  }
+
+  document.getElementById('alertas-wsp').innerHTML = html;
+}
+
+// INTERESES
+// Ordinaria: oe=ene ob=feb or=mar oa=abr oy=may
+// Extraordinaria: xr=mar xa=abr xy=may
+const MI=[
+  {mes:'Ene 2026',venc:new Date('2026-01-15'),co:'oe',cx:null},
+  {mes:'Feb 2026',venc:new Date('2026-02-15'),co:'ob',cx:null},
+  {mes:'Mar 2026',venc:new Date('2026-03-15'),co:'or',cx:'xr'},
+  {mes:'Abr 2026',venc:new Date('2026-04-15'),co:'oa',cx:'xa'},
+  {mes:'May 2026',venc:new Date('2026-05-15'),co:'oy',cx:'xy'},
+  {mes:'Jun 2026',venc:new Date('2026-06-15'),co:'ju_ord',cx:'ju_ext'},
+];
+
+function calcD(d,fc){
+  const td=0.04/30; let cap=0,int=0,filas='';
+  MI.forEach(m=>{
+    const cO=d[m.co]||0, cX=d[m.cx]||0;
+    if((!cO&&!cX)||fc<m.venc) return;
+    const dias=Math.floor((fc-m.venc)/86400000);
+    const iO=cO?Math.round(cO*td*dias):0;
+    const iX=cX?Math.round(cX*td*dias):0;
+    cap+=cO+cX; int+=iO+iX;
+    filas+=`<span style="background:#f5f5f5;padding:1px 6px;border-radius:4px;font-size:10px">${m.mes}: Ord ${fa(cO)}+${fa(iO)} · Ext ${fa(cX)}+${fa(iX)} (${dias}d)</span>`;
+  });
+  return{cap,int,tot:cap+int,filas};
+}
+
+window.calcTodos=()=>{
+  const fc=new Date(document.getElementById('int-f1').value);
+  if(!fc||isNaN(fc)){toast('⚠️ Ingresá fecha');return;}
+  fc.setHours(23,59,59);
+  let tC=0,tI=0;
+  const rows=DEU.map(d=>{
+    const {cap,int,tot,filas}=calcD(d,fc);
+    if(!cap)return'';tC+=cap;tI+=int;
+    return`<div class="lc pen">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name">${d.l}&nbsp;<span style="font-weight:400">${d.p}</span></div>
+          <div style="font-size:11px;margin:3px 0">Cap: <b>${fa(cap)}</b>&nbsp;&nbsp;<span style="color:#e53935">Int: <b>${fa(int)}</b></span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">${filas}</div>
+        </div>
+        <div class="lc-monto" style="color:#e53935">${fa(tot)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('int-res').innerHTML=`
+    <div class="g2" style="margin-top:8px">
+      <div class="met"><div class="ml">Capital</div><div class="mv rj" style="font-size:14px">${fa(tC)}</div></div>
+      <div class="met"><div class="ml">Intereses 4%</div><div class="mv rj" style="font-size:14px">${fa(tI)}</div></div>
+    </div>${rows}`;
+};
+
+window.calcLote=()=>{
+  const sel=document.getElementById('int-lote').value;
+  if(!sel){toast('⚠️ Seleccioná un lote');return;}
+  const fc=new Date(document.getElementById('int-f2').value);
+  if(!fc||isNaN(fc)){toast('⚠️ Ingresá fecha');return;}
+  fc.setHours(23,59,59);
+  const[lote,prop]=sel.split('|');
+  const d=DEU.find(x=>x.l===lote);
+  if(!d){toast('No encontrado');return;}
+  const td=0.04/30;
+
+  let capOrd=0,intOrd=0,capExt=0,intExt=0;
+  let filas='';
+
+  MI.forEach(m=>{
+    if(fc<m.venc) return;
+    const cO=d[m.co]||0, cX=d[m.cx]||0;
+    if(!cO&&!cX) return;
+    const dias=Math.floor((fc-m.venc)/86400000);
+    const iO=cO?Math.round(cO*td*dias):0;
+    const iX=cX?Math.round(cX*td*dias):0;
+    capOrd+=cO; intOrd+=iO;
+    capExt+=cX; intExt+=iX;
+
+    filas+=`<div style="border-bottom:.5px solid #f0f0f0;padding:8px 0">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">${m.mes} <span style="font-size:10px;color:#aaa">(${dias} días desde el 15)</span></div>
+      ${cO?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+        <span style="color:#1565c0">Exp. Ordinaria</span>
+        <span>Cap: <b>${fa(cO)}</b> · Int: <b style="color:#e53935">${fa(iO)}</b> · Sub: <b>${fa(cO+iO)}</b></span>
+      </div>`:''}
+      ${cX?`<div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:#1a7a4a">Exp. Extraordinaria</span>
+        <span>Cap: <b>${fa(cX)}</b> · Int: <b style="color:#e53935">${fa(iX)}</b> · Sub: <b>${fa(cX+iX)}</b></span>
+      </div>`:''}
+    </div>`;
+  });
+
+  const totOrd=capOrd+intOrd;
+  const totExt=capExt+intExt;
+  const totGen=totOrd+totExt;
+
+  // Guardar datos para imprimir
+  window._ultimoLote={...d, lote,prop,fc,filas,capOrd,intOrd,capExt,intExt,totOrd,totExt,totGen};
+
+  document.getElementById('int-res').innerHTML=`
+    <div class="lc pag" style="margin-top:8px">
+      <div style="background:#1a7a4a;color:#fff;padding:8px 10px;border-radius:8px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700">${lote} — ${prop}</div>
+        <div style="font-size:10px;opacity:.8">Al ${fc.toLocaleDateString('es-AR')} · Art. 8 Reglamento · Tasa 4% mensual</div>
+      </div>
+      ${filas||'<div style="text-align:center;color:#aaa;padding:12px">Sin deuda registrada</div>'}
+      <div style="margin-top:10px;background:#f5f5f5;border-radius:8px;padding:10px">
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:#555">RESUMEN</div>
+        ${capOrd?`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#1565c0">Exp. Ordinaria</span>
+          <span>Cap: <b>${fa(capOrd)}</b> + Int: <b style="color:#e53935">${fa(intOrd)}</b> = <b>${fa(totOrd)}</b></span>
+        </div>`:''}
+        ${capExt?`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px">
+          <span style="color:#1a7a4a">Exp. Extraordinaria</span>
+          <span>Cap: <b>${fa(capExt)}</b> + Int: <b style="color:#e53935">${fa(intExt)}</b> = <b>${fa(totExt)}</b></span>
+        </div>`:''}
+        <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid #ddd;padding-top:8px">
+          <span>TOTAL A COBRAR</span>
+          <span style="color:#1a7a4a">${fa(totGen)}</span>
+        </div>
+      </div>
+      <div style="font-size:9px;color:#aaa;text-align:center;margin-top:8px">Tasa: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes</div>
+      <button onclick="imprimirLote()" style="width:100%;margin-top:10px;padding:10px;background:#1565c0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir liquidación</button>
+    </div>`;
+};
+
+// ESTADO
+function actualizarEstado(){
+  const ing=COBROS.reduce((s,c)=>s+c.monto,0);
+  const egr=EGRESOS.reduce((s,e)=>s+e.m,0);
+  document.getElementById('ef-ing').textContent=fa(ing);
+  document.getElementById('ef-toting').textContent=fa(ing+711892);
+  document.getElementById('ef-egr').textContent=fa(egr);
+  document.getElementById('ef-saldo').textContent=fa(6022380+ing+711892-egr);
+}
+
+// RECIBOS
+function poblarRS(){
+  const s=document.getElementById('rs'); s.innerHTML='';
+  const cobPorLote={};
+  COBROS.forEach(c=>{ const k=parseInt(c.n); if(!cobPorLote[k]) cobPorLote[k]=[]; cobPorLote[k].push(c); });
+  LB.forEach(b=>{ if(cobPorLote[b.n]){ const o=document.createElement('option'); o.value=b.n; o.textContent=b.l+' — '+b.p; s.appendChild(o); } });
+  if(s.options.length) verRecibo();
+}
+
+window.verRecibo=()=>{
+  const n=parseInt(document.getElementById('rs').value);
+  const b=LB.find(x=>x.n===n);
+  const cobs=COBROS.filter(c=>parseInt(c.n)===n);
+  if(!b||!cobs.length){document.getElementById('rc').innerHTML='<div class="empty">Sin cobros</div>';return;}
+  const tot=cobs.reduce((s,c)=>s+c.monto,0);
+  const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join(' / ');
+  document.getElementById('rc').innerHTML=`
+    <div class="rw"><div class="rbx">
+      <div class="rh"><h2>🏘 Barrio Privado Las Palmas</h2>
+        <p>William Cross 3302 · Administradores: Juan Ponce / Walter Vallejo</p>
+        <p style="margin-top:5px;font-size:11px;font-weight:700;color:#222">Rendición — ${MES_NOM}</p>
+        ${recs?`<p style="font-size:12px;margin-top:3px">N° Recibo: <b>${recs}</b></p>`:''}
+      </div>
+      <div class="rr"><span class="rlab">Propietario</span><span><b>${b.p}</b></span></div>
+      <div class="rr"><span class="rlab">Lote</span><span>${b.l}</span></div>
+      <div class="rr"><span class="rlab">Fecha</span><span>${cobs[0].fecha||'—'}</span></div>
+      <div class="rr"><span class="rlab">Forma</span><span>${cobs[0].forma||'—'}</span></div>
+      ${cobs.map(c=>`<div class="rr"><span class="rlab">${tipoL(c.conc)}${c.obs?' ('+c.obs+')':''}</span><span style="font-weight:700">${fa(c.monto)}</span></div>`).join('')}
+      <div class="rtot"><span>Total abonado</span><span>${fa(tot)}</span></div>
+      <div class="rfirma">Contadora: Juana B. Varvaro · CPN · M.P 7450 - C.G.C.E.T.</div>
+    </div></div>`;
+};
+
+// Poblar select intereses
+function poblarIntLote(){
+  const s=document.getElementById('int-lote');
+  DEU.forEach(d=>{
+    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0);
+    if(!tot) return;
+    const o=document.createElement('option'); o.value=d.l+'|'+d.p; o.textContent=d.l+' — '+d.p; s.appendChild(o);
+  });
+}
+
+// Mapeo definitivo nombre Lemon → lote(s) — confirmado manualmente
+const LEMON_MAP=[
+  // Exactos
+  {key:'rodriguez lilian',  lotes:['L1 Sur']},
+  {key:'albarracin',        lotes:['L2 Sur']},
+  {key:'vallejo walter',    lotes:['L3 Sur']},
+  {key:'juarez martin',     lotes:['L4 Sur']},
+  {key:'azucena',           lotes:['L4 Sur']},   // Azucena del Carmen Cordoba, esposa Juarez
+  {key:'ibanez',            lotes:['L5 Sur']},
+  {key:'campos martinez',   lotes:['L6 Sur']},
+  {key:'ponce juan',        lotes:['L7 Sur','L8 Sur']},
+  {key:'leal hugo',         lotes:['L9 Sur']},
+  {key:'salas daniel',      lotes:['L10 Sur']},
+  {key:'varvaro',           lotes:['L11 Sur']},
+  {key:'aguirre mauricio',  lotes:['L12 Sur']},
+  {key:'fernandez carolina',lotes:['L13 Sur']},
+  {key:'herrera luis',      lotes:['L14 Sur']},
+  {key:'matias ruben',      lotes:['L15 Sur']},
+  {key:'niz marcelo',       lotes:['L16 Sur']},
+  {key:'veron alejandro',   lotes:['L17 Sur']},
+  {key:'alejandro victor',  lotes:['L17 Sur']},
+  {key:'maidana enzo',      lotes:['L18 Sur']},
+  {key:'marazza',           lotes:['L19 Sur','L42 Norte','L43 Norte']},
+  {key:'francisca del carmen',lotes:['L19 Sur','L42 Norte','L43 Norte']}, // esposa Marazza
+  {key:'franco ramos',      lotes:['L20 Sur']},
+  {key:'ramos hernandez',   lotes:['L22 Norte']},
+  {key:'orieta osvaldo',    lotes:['L21 Sur']},
+  {key:'bollea roxana',     lotes:['L22 Sur','L26 Sur']},
+  {key:'leal sebastian',    lotes:['L23 Sur']},
+  {key:'lema roberto',      lotes:['L24 Sur']},
+  {key:'espin dora',        lotes:['L25 Sur']},
+  {key:'alderete',          lotes:['L27 Sur']},
+  {key:'recazan',           lotes:['L28 Sur']},  // Recazan Monroy Romina
+  {key:'monroy',            lotes:['L28 Sur']},
+  {key:'lane brian',        lotes:['L28 Sur']},
+  {key:'medina juan',       lotes:['L29 Sur','L30 Sur']},
+  {key:'mariana elina',     lotes:['L31 Sur']},  // De La Vega Rossana
+  {key:'alva',              lotes:['L31 Sur']},
+  {key:'carrizo',           lotes:['L32 Sur']},
+  {key:'ramos augusto',     lotes:['L33 Sur']},
+  {key:'bazan franco',      lotes:['L34 Sur']},
+  {key:'franco emmanuel',   lotes:['L34 Sur']},  // Bazan Ruiz
+  {key:'miguel angel dair', lotes:['L35 Sur']},  // esposo Di Bello
+  {key:'bellone',           lotes:['L35 Sur']},  // Bellone Carlos, esposo Di Bello
+  {key:'di bello',          lotes:['L35 Sur']},
+  {key:'villagra gustavo',  lotes:['L36 Sur']},
+  {key:'orieta daniel',     lotes:['L37 Sur']},
+  {key:'garcia fernanda',   lotes:['L38 Sur']},
+  {key:'hugo emmanuel',     lotes:['L39 Sur']},  // Zelaya
+  {key:'zelaya hugo',       lotes:['L39 Sur']},
+  {key:'zelaya hernan',     lotes:['L40 Sur']},
+  {key:'rodrigo figueroa',  lotes:['L1 Norte']},
+  {key:'figueroa jose',     lotes:['L1 Norte']},
+  {key:'silvana patricia',  lotes:['L1 Norte']},  // esposa Figueroa
+  {key:'padilla maria',     lotes:['L2 Norte']},
+  {key:'cadeneau',          lotes:['L2 Norte']},  // paga por Padilla
+  {key:'orrego oscar',      lotes:['L3 Norte']},
+  {key:'oscar fabian',      lotes:['L3 Norte']},
+  {key:'lugones',           lotes:['L4 Norte']},
+  {key:'gustavo javier',    lotes:['L5 Norte']},  // Salva
+  {key:'salva gustavo',     lotes:['L5 Norte']},
+  {key:'emge martin',       lotes:['L6 Norte']},
+  {key:'martin lorenz',     lotes:['L28 Norte']}, // Lorenz Emge = Hermann Emge L28 Norte
+  {key:'robles juan',       lotes:['L7 Norte']},
+  {key:'romano ramon',      lotes:['L8 Norte']},
+  {key:'ira ez',            lotes:['L8 Norte']},
+  {key:'soregaroli',        lotes:['L9 Norte']},
+  {key:'hernando',          lotes:['L10 Norte']},
+  {key:'mamani',            lotes:['L11 Norte']},
+  {key:'mariana elina alva',lotes:['L12 Norte']}, // esposa Nina Juan Carlos
+  {key:'nina juan',         lotes:['L12 Norte']},
+  {key:'diego german egea', lotes:['L13 Norte']},
+  {key:'basso gabriela',    lotes:['L14 Norte']},
+  {key:'luna osvaldo',      lotes:['L15 Norte']},
+  {key:'osvaldo rene',      lotes:['L15 Norte']},
+  {key:'santillan',         lotes:['L16 Norte']},
+  {key:'patricia marina',   lotes:['L16 Norte']},  // esposa Santillan
+  {key:'patricia marna',    lotes:['L16 Norte']},
+  {key:'maidana enzo',      lotes:['L17 Norte']},
+  {key:'ponce giselle',     lotes:['L18 Norte']},
+  {key:'eluna rita',        lotes:['L19 Norte']},
+  {key:'pacheco eliana',    lotes:['L19 Norte']},
+  {key:'nadal jose',        lotes:['L20 Norte']},
+  {key:'nader carlos',      lotes:['L21 Norte']},
+  {key:'ramos eduardo',     lotes:['L22 Norte']},
+  {key:'luna belen',        lotes:['L23 Norte']},
+  {key:'maria belen',       lotes:['L23 Norte']},
+  {key:'gutierrez jose',    lotes:['L24 Norte']},
+  {key:'jose ignacio',      lotes:['L24 Norte']},
+  {key:'sosa christian',    lotes:['L25 Norte']},
+  {key:'rivero belen',      lotes:['L26 Norte']},
+  {key:'catillo',           lotes:['L27 Norte']},
+  {key:'lema karina',       lotes:['L29 Norte']},
+  {key:'ana karina',        lotes:['L29 Norte']},
+  {key:'diaz roxana',       lotes:['L30 Norte']},
+  {key:'roxana del valle',  lotes:['L30 Norte']},
+  {key:'olivera silvana',   lotes:['L31 Norte','L32 Norte']},
+  {key:'pedraza elena',     lotes:['L33 Norte']},
+  {key:'avelina elena',     lotes:['L33 Norte']},
+  {key:'garcia cote',       lotes:['L34 Norte']},
+  {key:'justiniano',        lotes:['L35 Norte']},
+  {key:'morales roberto',   lotes:['L36 Norte','L40 Norte']},
+  {key:'bautista luis',     lotes:['L37 Norte']},
+  {key:'campero',           lotes:['L38 Norte']},
+  {key:'jose ricardo',      lotes:['L39 Norte']},
+  {key:'acuna jose',        lotes:['L39 Norte']},
+  {key:'zubelsa',           lotes:['L41 Norte']},
+  {key:'szmyd',             lotes:['L44 Norte']},
+  {key:'hector damian',     lotes:['L44 Norte']},
+];
+
+function lemonLotes(razon){
+  const r=razon.toLowerCase();
+  for(const m of LEMON_MAP){ if(r.includes(m.key)) return m.lotes; }
+  return null;
+}
+
+// Depósitos Lemon precargados del PDF mayo 2026
+const LEMON_DEP=[
+  {fecha:'2/5/2026',  monto:90000,  razon:'Diego German Egea'},
+  {fecha:'4/5/2026',  monto:185000, razon:'Franco Ramos'},
+  {fecha:'5/5/2026',  monto:90000,  razon:'Fernando David Campos Martinez'},
+  {fecha:'5/5/2026',  monto:167893, razon:'Maria Josefina Padilla'},
+  {fecha:'5/5/2026',  monto:90000,  razon:'Jose Ignacio Gutierrez'},
+  {fecha:'6/5/2026',  monto:100000, razon:'Hugo Emmanuel Zelaya'},
+  {fecha:'8/5/2026',  monto:90000,  razon:'Mauricio Fabian Aguirre'},
+  {fecha:'8/5/2026',  monto:90000,  razon:'Osvaldo Rene Luna'},
+  {fecha:'9/5/2026',  monto:90000,  razon:'Recazan Monroy Romina'},
+  {fecha:'9/5/2026',  monto:185000, razon:'Azucena del Carmen Cordoba'},
+  {fecha:'9/5/2026',  monto:89600,  razon:'Diaz Roxana del Valle'},
+  {fecha:'9/5/2026',  monto:90000,  razon:'Rodriguez Lilian Estela'},
+  {fecha:'9/5/2026',  monto:90000,  razon:'Ana Karina Lema'},
+  {fecha:'11/5/2026', monto:180000, razon:'Medina Juan Esteban'},
+  {fecha:'11/5/2026', monto:90000,  razon:'Ramos Hernandez Eduardo Oscar'},
+  {fecha:'11/5/2026', monto:90000,  razon:'Alejandro Victor Veron'},
+  {fecha:'11/5/2026', monto:270000, razon:'Francisca del Carmen Claro'},
+  {fecha:'12/5/2026', monto:90000,  razon:'Martin Lorenz Emge'},
+  {fecha:'13/5/2026', monto:90000,  razon:'Mariana Elina Alva'},
+  {fecha:'13/5/2026', monto:120000, razon:'Mariana Elina Alva'},
+  {fecha:'13/5/2026', monto:75507,  razon:'Hector Damian Szmyd'},
+  {fecha:'14/5/2026', monto:90000,  razon:'Espin Dora Estela del Valle'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Avelina Elena Pedraza'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Matias Ruben Rodriguez'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Ira Ez Luciana Maria'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Oque Salvador Ezequiel'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Gustavo Javier Salva'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Silvana Patricia Lima'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Rodrigo Figueroa Blasco'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Franco Emmanuel Bazan Ruiz'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Maria Belen Luna'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Oscar Fabian Orrego'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Cadeneau Maria Julieta'},
+  {fecha:'15/5/2026', monto:90000,  razon:'Jose Sebastian Leal'},
+  {fecha:'15/5/2026', monto:98000,  razon:'Alejandro Victor Veron'},
+  {fecha:'16/5/2026', monto:63600,  razon:'Miguel Angel Dair'},
+  {fecha:'16/5/2026', monto:110000, razon:'Eluna Rita Pacheco'},
+  {fecha:'19/5/2026', monto:90000,  razon:'Justiniano Natalia Elizabeth'},
+  {fecha:'19/5/2026', monto:90000,  razon:'Jose Ricardo Acuna'},
+  {fecha:'19/5/2026', monto:3600,   razon:'Jose Ricardo Acuna'},
+  {fecha:'19/5/2026', monto:96152,  razon:'Sosa Christian Franco'},
+  {fecha:'21/5/2026', monto:3600,   razon:'Justiniano Natalia Elizabeth'},
+  {fecha:'22/5/2026', monto:198233, razon:'Bellone Carlos Alfredo'},
+  {fecha:'27/5/2026', monto:90000,  razon:'Cristian Ramon Santillan'},
+  {fecha:'27/5/2026', monto:63600,  razon:'Patricia Marina Villagra'},
+  {fecha:'27/5/2026', monto:3600,   razon:'Cristian Ramon Santillan'},
+  {fecha:'29/5/2026', monto:90000,  razon:'Nader Carlos Leonardo'},
+  {fecha:'31/5/2026', monto:11400,  razon:'Francisca del Carmen Claro'},
+];
+
+// Egresos Lemon (no depósitos)
+const LEMON_EGR=[
+  {fecha:'4/5/2026',  monto:3050,   razon:'Mayber Axel Guiroga Alfaro', tipo:'TRANSFERENCIA'},
+  {fecha:'8/5/2026',  monto:19267,  razon:'DEBITO',                     tipo:'DÉBITO'},
+  {fecha:'13/5/2026', monto:145000, razon:'Coronel Marcelo De Los Angeles', tipo:'TRANSFERENCIA'},
+];
+
+function renderConc(){
+  // Cobros app indexados por lote
+  const lotesConCobro=new Set();
+  // También indexar por N° transacción Lemon para cruce exacto
+  const cobrosPorLemon={};
+  COBROS.forEach(c=>{
+    const b=LB.find(x=>x.n===parseInt(c.n)); if(!b) return;
+    lotesConCobro.add(b.l);
+    if(c.lemon&&c.lemon.trim()){
+      const k=c.lemon.trim().toLowerCase();
+      cobrosPorLemon[k]=b.l;
+    }
+  });
+
+  // Por cada depósito Lemon verificar si está en app
+  const filas=LEMON_DEP.map(d=>{
+    const lotes=lemonLotes(d.razon)||[];
+    // Cruce por N° transacción (últimos dígitos del Transaction ID)
+    const tidKey=d.tid?d.tid.replace(/-/g,'').toLowerCase().slice(-8):'';
+    const lotePorTid=tidKey?Object.keys(cobrosPorLemon).find(k=>k.includes(tidKey)||tidKey.includes(k)):null;
+    const tieneEnApp=lotePorTid?true:lotes.some(l=>lotesConCobro.has(l));
+    const estado=!lotes.length&&!lotePorTid?'sin-map':tieneEnApp?'ok':'no-app';
+    return{...d, lotes, lotesStr:lotes.join(', ')||'?', estado, tieneEnApp};
+  });
+
+  // Métricas
+  const nOk=filas.filter(f=>f.estado==='ok').length;
+  const nFalta=filas.filter(f=>f.estado==='no-app').length;
+  const nSinMap=filas.filter(f=>f.estado==='sin-map').length;
+  const totL=LEMON_DEP.reduce((s,d)=>s+d.monto,0);
+  document.getElementById('cn-tot-lem').textContent=fa(totL);
+  document.getElementById('cn-tot-app').textContent=`${nOk} de ${filas.length}`;
+  document.getElementById('cn-ok').textContent=nOk;
+  document.getElementById('cn-diff').textContent=nFalta+(nSinMap?` (+${nSinMap} sin map)`:'');
+
+  const html=`
+    <div class="card" style="padding:8px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px">
+        🏦 Depósitos Lemon mayo 2026 — ¿están en la app?
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:#f5f5f5">
+            <th style="padding:7px 6px;text-align:left;font-size:10px;color:#888;white-space:nowrap">Fecha</th>
+            <th style="padding:7px 6px;text-align:left;font-size:10px;color:#888">Nombre Lemon</th>
+            <th style="padding:7px 6px;text-align:left;font-size:10px;color:#888">Lote</th>
+            <th style="padding:7px 6px;text-align:right;font-size:10px;color:#1565c0">Monto</th>
+            <th style="padding:7px 6px;text-align:center;font-size:10px;color:#888">En app</th>
+          </tr></thead>
+          <tbody>
+            ${filas.map(f=>`
+              <tr style="border-bottom:.5px solid #f0f0f0;background:${f.estado==='no-app'?'#fff5f5':''}">
+                <td style="padding:6px;color:#888;white-space:nowrap">${f.fecha}</td>
+                <td style="padding:6px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.razon}">${f.razon}</td>
+                <td style="padding:6px;font-weight:600;font-size:11px;color:#555">${f.lotesStr}</td>
+                <td style="padding:6px;text-align:right;font-weight:700;color:#1565c0">${fa(f.monto)}</td>
+                <td style="padding:6px;text-align:center;font-size:16px">
+                  ${f.estado==='ok'
+                    ?'<span style="color:#1a7a4a">✓</span>'
+                    :f.estado==='no-app'
+                      ?`<button onclick="precargarCobro('${f.lotes[0]||''}',${f.monto},'${f.fecha}')" style="font-size:10px;background:#e53935;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer">➕ Registrar</button>`
+                      :'<span style="color:#aaa">?</span>'
+                  }
+                </td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot><tr style="background:#f5f5f5;font-weight:700">
+            <td colspan="3" style="padding:7px 6px;font-size:11px">Total Lemon</td>
+            <td style="padding:7px 6px;text-align:right;color:#1565c0">${fa(totL)}</td>
+            <td style="padding:7px 6px;text-align:center;font-size:11px;color:#1a7a4a">${nOk}/${filas.length}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+    ${LEMON_EGR.length?`
+    <div class="card" style="margin-top:8px">
+      <div style="font-size:11px;font-weight:700;color:#e53935;margin-bottom:6px">📤 Egresos billetera Lemon</div>
+      ${LEMON_EGR.map(e=>`
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:.5px solid #f0f0f0;font-size:11px">
+          <span style="color:#555">${e.fecha} · ${e.razon}</span>
+          <span style="font-weight:700;color:#e53935">${fa(e.monto)}</span>
+        </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;padding-top:6px;border-top:1px solid #ddd;margin-top:4px">
+        <span>Total egresos</span>
+        <span style="color:#e53935">${fa(LEMON_EGR.reduce((s,e)=>s+e.monto,0))}</span>
+      </div>
+    </div>`:''}`;
+
+  document.getElementById('lista-conc').innerHTML=html;
+}
+window.imprimirDeu=()=>{
+  const fecha=new Date().toLocaleDateString('es-AR');
+  const filas=DEU.map(d=>{
+    const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0);
+    const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0);
+    const tot=totOrd+totExt;
+    if(!tot) return '';
+    const meses=[];
+    if(d.oe) meses.push(`Ene ord: ${fa(d.oe)}`);
+    if(d.ob) meses.push(`Feb ord: ${fa(d.ob)}`);
+    if(d.or) meses.push(`Mar ord: ${fa(d.or)}`);
+    if(d.oa) meses.push(`Abr ord: ${fa(d.oa)}`);
+    if(d.oy) meses.push(`May ord: ${fa(d.oy)}`);
+    if(d.xr) meses.push(`Mar ext: ${fa(d.xr)}`);
+    if(d.xa) meses.push(`Abr ext: ${fa(d.xa)}`);
+    if(d.xy) meses.push(`May ext: ${fa(d.xy)}`);
+    return `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:600">${d.l}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee">${d.p}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555">${meses.join(' · ')}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:#1565c0;font-weight:700">${fa(totOrd)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:#1a7a4a;font-weight:700">${fa(totExt)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#e53935">${fa(tot)}</td>
+    </tr>`;
+  }).join('');
+  const totOrdGen=DEU.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0),0);
+  const totExtGen=DEU.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0),0);
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Informe Deuda — Barrio Las Palmas</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#222}
+    h2{color:#1a7a4a;margin-bottom:4px}
+    .sub{color:#888;font-size:11px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f5f5f5;padding:7px 8px;text-align:left;font-size:11px;color:#555;border-bottom:2px solid #ddd}
+    th.r{text-align:right}
+    tfoot td{font-weight:700;padding:8px;border-top:2px solid #ddd}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h2>Consorcio Barrio Las Palmas</h2>
+  <div class="sub">Informe de deuda capital al ${fecha} · Administradores: Juan Ponce / Walter Vallejo</div>
+  <button onclick="window.print()" style="margin-bottom:12px;padding:8px 16px;background:#1a7a4a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
+  <table>
+    <thead><tr>
+      <th>Lote</th><th>Propietario</th><th>Detalle</th>
+      <th class="r">Ord.</th><th class="r">Ext.</th><th class="r">Total</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr>
+      <td colspan="3">TOTAL GENERAL</td>
+      <td style="text-align:right;color:#1565c0">${fa(totOrdGen)}</td>
+      <td style="text-align:right;color:#1a7a4a">${fa(totExtGen)}</td>
+      <td style="text-align:right;color:#e53935">${fa(totOrdGen+totExtGen)}</td>
+    </tr></tfoot>
+  </table>
+  <div style="margin-top:40px;font-size:10px;color:#aaa;text-align:center">
+    Generado el ${fecha} · Consorcio Barrio Las Palmas · Contadora: Juana B. Varvaro CPN M.P 7450
+  </div>
+  </body></html>`);
+  w.document.close();
+};
+
+window.precargarCobro=(lote,monto,fecha)=>{
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('on'));
+  document.querySelector('[onclick*="\'cob\'"]').classList.add('on');
+  document.getElementById('pnl-cob').classList.add('on');
+  const b=LB.find(x=>x.l===lote);
+  if(b){
+    document.getElementById('sl').value=b.n;
+    document.getElementById('im').value=monto;
+    document.getElementById('sf').value='Transferencia';
+    document.getElementById('id').value=fecha;
+    document.getElementById('sc').value='ordinaria';
+    document.getElementById('sl').scrollIntoView({behavior:'smooth',block:'center'});
+    toast('📋 Completá el N° de recibo y guardá');
+  }
+};
+
+window.imprimirLote=()=>{
+  const r=window._ultimoLote; if(!r) return;
+  const {lote,prop,fc,capOrd,intOrd,capExt,intExt,totOrd,totExt,totGen}=r;
+  const fecha=fc.toLocaleDateString('es-AR');
+  const hoy=new Date().toLocaleDateString('es-AR');
+  const td=0.04/30;
+
+  // Generar filas detalladas igual que en pantalla
+  let filasHTML='';
+  MI.forEach(m=>{
+    if(fc<m.venc) return;
+    const cO=r[m.co]||0, cX=r[m.cx]||0;
+    if(!cO&&!cX) return;
+    const dias=Math.floor((fc-m.venc)/86400000);
+    const iO=cO?Math.round(cO*td*dias):0;
+    const iX=cX?Math.round(cX*td*dias):0;
+    filasHTML+=`<tr style="background:#fafafa">
+      <td colspan="5" style="padding:6px 8px;font-weight:700;color:#555;border-bottom:.5px solid #eee;font-size:11px">
+        ${m.mes} <span style="font-size:10px;color:#aaa;font-weight:400">(${dias} días desde el 15)</span>
+      </td>
+    </tr>`;
+    if(cO) filasHTML+=`<tr>
+      <td style="padding:5px 8px 5px 20px;border-bottom:.5px solid #f0f0f0;color:#1565c0">Exp. Ordinaria</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0">${fa(cO)}</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0;color:#e53935">${fa(iO)}</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0;font-weight:700">${fa(cO+iO)}</td>
+    </tr>`;
+    if(cX) filasHTML+=`<tr>
+      <td style="padding:5px 8px 5px 20px;border-bottom:.5px solid #f0f0f0;color:#1a7a4a">Exp. Extraordinaria</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0">${fa(cX)}</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0;color:#e53935">${fa(iX)}</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:.5px solid #f0f0f0;font-weight:700">${fa(cX+iX)}</td>
+    </tr>`;
+  });
+
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Liquidación — ${lote}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;margin:30px;color:#222}
+    h1{color:#1a7a4a;font-size:16px;margin:0 0 2px}
+    .sub{color:#888;font-size:10px;margin-bottom:20px}
+    .encabezado{background:#1a7a4a;color:#fff;padding:12px 16px;border-radius:8px;margin-bottom:16px}
+    .encabezado h2{margin:0;font-size:14px}
+    .encabezado p{margin:4px 0 0;font-size:10px;opacity:.85}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#f5f5f5;padding:7px 8px;text-align:left;color:#555;border-bottom:2px solid #ddd;font-size:10px}
+    th.r{text-align:right}
+    .subtotal td{background:#eef2ff;font-weight:700;padding:6px 8px}
+    .subtotal-ext td{background:#eefaf3;font-weight:700;padding:6px 8px}
+    .total td{background:#1a7a4a;color:#fff;font-weight:700;padding:9px 8px;font-size:13px}
+    .firmas{display:flex;justify-content:space-between;margin-top:50px}
+    .firma{text-align:center;width:45%}
+    .firma-linea{border-top:1px solid #555;padding-top:6px;font-size:11px}
+    .footer{font-size:10px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:10px;margin-top:20px}
+    .art{font-size:9px;color:#888;text-align:center;margin-top:8px;font-style:italic}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h1>Consorcio de Propietarios Barrio Las Palmas</h1>
+  <div class="sub">Domicilio: William Cross 3302 · Administradores: Juan Ponce / Walter Vallejo · Tel: 3814097776 / 3815995289</div>
+  <button onclick="window.print()" style="margin-bottom:16px;padding:8px 18px;background:#1565c0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">🖨️ Imprimir</button>
+  <div class="encabezado">
+    <h2>Liquidación de deuda con intereses punitorios</h2>
+    <p>${lote} — ${prop} · Al ${fecha} · Art. 8 Reglamento · Tasa 4% mensual</p>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Período / Tipo</th>
+      <th class="r">Capital ($)</th>
+      <th class="r" style="color:#e53935">Interés ($)</th>
+      <th class="r">Subtotal ($)</th>
+    </tr></thead>
+    <tbody>${filasHTML}</tbody>
+    <tfoot>
+      ${capOrd?`<tr class="subtotal"><td>Subtotal Exp. Ordinaria</td><td style="text-align:right">${fa(capOrd)}</td><td style="text-align:right;color:#e53935">${fa(intOrd)}</td><td style="text-align:right">${fa(totOrd)}</td></tr>`:''}
+      ${capExt?`<tr class="subtotal-ext"><td>Subtotal Exp. Extraordinaria</td><td style="text-align:right">${fa(capExt)}</td><td style="text-align:right;color:#e53935">${fa(intExt)}</td><td style="text-align:right">${fa(totExt)}</td></tr>`:''}
+      <tr class="total"><td>TOTAL A COBRAR</td><td style="text-align:right">${fa(capOrd+capExt)}</td><td style="text-align:right">${fa(intOrd+intExt)}</td><td style="text-align:right;font-size:14px">${fa(totGen)}</td></tr>
+    </tfoot>
+  </table>
+  <div style="background:#fdecea;border:1px solid #e53935;border-radius:6px;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;color:#c62828;margin:12px 0">⚠️ El presente cálculo está SUJETO A VERIFICACIÓN</div>
+  <div class="art">Art. 8 Reglamento de Copropiedad · Tasa punitoria: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes</div>
+  <div class="firmas">
+    <div class="firma"><div style="height:40px"></div>
+      <div class="firma-linea">Juan Ponce / Walter Vallejo<br><span style="font-size:10px;color:#888">Administradores</span></div>
+    </div>
+    <div class="firma"><div style="height:40px"></div>
+      <div class="firma-linea">Juana B. Varvaro<br><span style="font-size:10px;color:#888">Contadora Pública · M.P 7450 - C.G.C.E.T.</span></div>
+    </div>
+  </div>
+  <div class="footer">Generado el ${hoy} · Consorcio Barrio Las Palmas · William Cross 3302</div>
+  </body></html>`);
+  w.document.close();
+};
+
+// INIT
+poblarSL();
+poblarIntLote();
+renderDeu();
+document.getElementById('ef').value=new Date().toISOString().slice(0,10);
+document.getElementById('int-f1').value=new Date().toISOString().slice(0,10);
+document.getElementById('int-f2').value=new Date().toISOString().slice(0,10);
+listenCobros();
+listenEgresos();
+cargarTodosCobros();
+if(USER_ACTUAL) listenActividad();
+</script>
+</body>
+</html>
