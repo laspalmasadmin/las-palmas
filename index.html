@@ -1417,13 +1417,16 @@ window.calcLote=()=>{
     const cO=d[m.co]||0, cX=d[m.cx]||0;
     if(!cO&&!cX) return;
     const dias=Math.floor((fc-m.venc)/86400000);
-    const iO=cO?Math.round(cO*td*dias):0;
-    const iX=cX?Math.round(cX*td*dias):0;
+    const fcDate=new Date(fc);
+    const vencDate=new Date(m.venc);
+    const esMesCurso = fcDate.getFullYear()===vencDate.getFullYear() && fcDate.getMonth()===vencDate.getMonth();
+    const iO=cO?(esMesCurso?Math.round(cO*0.04):Math.round(cO*td*dias)):0;
+    const iX=cX?(esMesCurso?Math.round(cX*0.04):Math.round(cX*td*dias)):0;
     capOrd+=cO; intOrd+=iO;
     capExt+=cX; intExt+=iX;
-
+    const labelPer = esMesCurso ? '(4% mensual fijo)' : `(${dias} días desde el 15)`;
     filas+=`<div style="border-bottom:.5px solid #f0f0f0;padding:8px 0">
-      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">${m.mes} <span style="font-size:10px;color:#aaa">(${dias} días desde el 15)</span></div>
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">${m.mes} <span style="font-size:10px;color:#aaa">${labelPer}</span></div>
       ${cO?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
         <span style="color:#1565c0">Exp. Ordinaria</span>
         <span>Cap: <b>${fa(cO)}</b> · Int: <b style="color:#e53935">${fa(iO)}</b> · Sub: <b>${fa(cO+iO)}</b></span>
