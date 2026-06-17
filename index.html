@@ -262,7 +262,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <button class="btn" onclick="imprimirDeu()" style="background:#1565c0;width:auto;padding:8px 16px">🖨️ Imprimir informe</button>
   </div>
   <div class="g2">
-    <div class="met"><div class="ml">Deudores</div><div class="mv rj">35</div></div>
+    <div class="met"><div class="ml">Deudores</div><div class="mv rj" id="deu-cnt">—</div></div>
     <div class="met"><div class="ml">Capital ordinario</div><div class="mv rj" id="deu-tot-ord">—</div></div>
     <div class="met"><div class="ml">Capital extraordinario</div><div class="mv rj" id="deu-tot-ext">—</div></div>
     <div class="met"><div class="ml">Total capital</div><div class="mv rj" id="deu-tot-gen">—</div></div>
@@ -1195,6 +1195,8 @@ function renderDeu(){
   // Totales generales con deuda efectiva
   const totOrdGen = DEU_EF.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0),0);
   const totExtGen = DEU_EF.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0),0);
+  const cntDeu = DEU_EF.filter(d=>(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)>0).length;
+  document.getElementById('deu-cnt').textContent = cntDeu;
   document.getElementById('deu-tot-ord').textContent = fa(totOrdGen);
   document.getElementById('deu-tot-ext').textContent = fa(totExtGen);
   document.getElementById('deu-tot-gen').textContent = fa(totOrdGen+totExtGen);
