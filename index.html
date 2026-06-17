@@ -1348,16 +1348,13 @@ function calcD(d,fc){
     const cO=d[m.co]||0, cX=d[m.cx]||0;
     if((!cO&&!cX)||fc<m.venc) return;
     const dias=Math.floor((fc-m.venc)/86400000);
-    // Si el vencimiento fue en el mes en curso (dentro de los últimos 31 días),
-    // aplicar 4% fijo en lugar de diario
-    const hoy=new Date(fc); hoy.setHours(0,0,0,0);
-    const venc=new Date(m.venc); venc.setHours(0,0,0,0);
-    const diasDesdeVenc=Math.floor((hoy-venc)/86400000);
-    // Mes en curso: venció pero hace menos de 31 días → 4% fijo
-    const esMesCurso = diasDesdeVenc >= 0 && diasDesdeVenc < 31;
+    // Mes en curso: el vencimiento es del mismo mes/año que la fecha de cálculo → 4% fijo
+    const fcDate=new Date(fc);
+    const vencDate=new Date(m.venc);
+    const esMesCurso = fcDate.getFullYear()===vencDate.getFullYear() && fcDate.getMonth()===vencDate.getMonth();
     let iO, iX;
     if(esMesCurso){
-      // 4% fijo mensual
+      // 4% fijo mensual para el mes en curso
       iO=cO?Math.round(cO*0.04):0;
       iX=cX?Math.round(cX*0.04):0;
       cap+=cO+cX; int+=iO+iX;
@@ -1519,7 +1516,7 @@ window.verRecibo=()=>{
 function poblarIntLote(){
   const s=document.getElementById('int-lote');
   DEU.forEach(d=>{
-    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0);
+    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ord||0)+(d.ju_ext||0);
     if(!tot) return;
     const o=document.createElement('option'); o.value=d.l+'|'+d.p; o.textContent=d.l+' — '+d.p; s.appendChild(o);
   });
@@ -1885,11 +1882,15 @@ window.imprimirLote=()=>{
     const cO=r[m.co]||0, cX=r[m.cx]||0;
     if(!cO&&!cX) return;
     const dias=Math.floor((fc-m.venc)/86400000);
-    const iO=cO?Math.round(cO*td*dias):0;
-    const iX=cX?Math.round(cX*td*dias):0;
+    const fcDate=new Date(fc);
+    const vencDate=new Date(m.venc);
+    const esMesCurso = fcDate.getFullYear()===vencDate.getFullYear() && fcDate.getMonth()===vencDate.getMonth();
+    const iO=cO?(esMesCurso?Math.round(cO*0.04):Math.round(cO*td*dias)):0;
+    const iX=cX?(esMesCurso?Math.round(cX*0.04):Math.round(cX*td*dias)):0;
+    const labelPeriodo = esMesCurso ? `(4% mensual fijo)` : `(${dias} días desde el 15)`;
     filasHTML+=`<tr style="background:#fafafa">
       <td colspan="5" style="padding:6px 8px;font-weight:700;color:#555;border-bottom:.5px solid #eee;font-size:11px">
-        ${m.mes} <span style="font-size:10px;color:#aaa;font-weight:400">(${dias} días desde el 15)</span>
+        ${m.mes} <span style="font-size:10px;color:#aaa;font-weight:400">${labelPeriodo}</span>
       </td>
     </tr>`;
     if(cO) filasHTML+=`<tr>
