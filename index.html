@@ -152,6 +152,10 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="met"><div class="ml">Total cobrado</div><div class="mv vd" id="m-tot" style="font-size:13px">—</div></div>
     <div class="met"><div class="ml">% avance</div><div class="mv nj" id="m-pct">—</div></div>
   </div>
+  <div class="g2">
+    <div class="met"><div class="ml">↳ Capital cobrado</div><div class="mv vd" id="m-cap" style="font-size:13px">—</div></div>
+    <div class="met"><div class="ml">↳ Interés cobrado</div><div class="mv" id="m-int" style="font-size:13px;color:#e53935">—</div></div>
+  </div>
   <div class="card">
     <div style="font-size:11px;font-weight:600;margin-bottom:4px">Avance</div>
     <div class="pb"><div class="pf" id="prog" style="width:0%"></div></div>
@@ -167,14 +171,15 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <!-- Registrar -->
   <div class="card">
     <div class="ct">➕ Registrar cobro</div>
-    <div class="fg"><label>Lote</label><select id="sl"></select></div>
+    <div class="fg"><label>Lote</label><select id="sl" onchange="actualizarDeudaPreview();renderInteresPeriodos()"></select></div>
     <div class="fg"><label>Concepto</label>
-      <select id="sc">
+      <select id="sc" onchange="actualizarDeudaPreview();renderInteresPeriodos()">
         <option value="ordinaria">Exp. Ordinaria</option>
         <option value="extraordinaria">Exp. Extraordinaria</option>
         <option value="cargo">Cargo</option>
       </select>
     </div>
+    <div class="fg" id="deuda-preview" style="display:none;background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:8px 10px;margin-bottom:8px"></div>
     <div class="fg"><label>Períodos que cancela</label>
 <div class="per-grid">
   <label class="per-item ord"><input type="checkbox" name="sper" value="oe"> Ene ord</label>
@@ -188,7 +193,16 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <label class="per-item ord"><input type="checkbox" name="sper" value="ju_ord"> Jun ord</label>
   <label class="per-item ext"><input type="checkbox" name="sper" value="ju_ext"> Jun ext</label>
   <label class="per-item otro"><input type="checkbox" name="sper" value="otro"> Otro</label>
-</div></div><div class="fg"><label>Monto ($)</label><input type="number" id="im" inputmode="numeric" placeholder="90000"></div>
+</div></div>
+    <div class="fg" id="interes-wrap">
+      <label>Capital e interés por período (editable a mano)</label>
+      <div id="interes-periodos"></div>
+      <button type="button" class="btn-sm" style="width:100%;background:#fff;border-color:#1565c0;color:#1565c0;font-weight:700;margin-top:2px" onclick="recalcularInteresPeriodos()">📐 Sugerir interés (4% Art. 8) — opcional</button>
+    </div>
+    <div class="fg">
+      <label>Monto total cobrado ($) — se calcula solo</label>
+      <input type="number" id="im" inputmode="numeric" readonly value="0" style="background:#f0f2f5;font-weight:700;color:#1a7a4a">
+    </div>
     <div class="fg"><label>Forma</label><select id="sf" onchange="toggleLemon(this.value)"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
     <div class="fg" id="fg-lemon" style="display:none"><label>N° transacción Lemon</label><input type="text" id="ilemon" placeholder="últimos dígitos ej: 3401b"></div>
     <div class="fg"><label>N° Recibo</label><input type="text" id="ir" placeholder="355"></div>
@@ -196,6 +210,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg"><label>Observación</label><input type="text" id="iob" placeholder="Cuota 3/12"></div>
     <button class="btn" id="btn-reg" onclick="registrar()">✓ Registrar cobro</button>
   </div>
+
   <input class="srch" type="search" placeholder="🔍 Buscar lote o propietario..." oninput="filtrarL(this.value)">
   <div id="lista-cob"><div class="empty">Cargando...</div></div>
 </div>
@@ -220,12 +235,13 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
         <th class="num" style="min-width:70px;color:#1565c0">Ordinaria</th>
         <th class="num" style="min-width:75px;color:#1a7a4a">Extraordinaria</th>
         <th class="num" style="min-width:60px;color:#e65100">Cargo</th>
+        <th class="num" style="min-width:65px;color:#e53935">Interés</th>
         <th class="num" style="min-width:65px">Recibo</th>
         <th class="num" style="min-width:75px">Fecha</th>
         <th class="num" style="min-width:70px;font-weight:700;color:#222">Total</th>
       </tr></thead>
       <tbody id="tb-rend"></tbody>
-      <tfoot id="tf-rend"><tr><td colspan="9" style="padding:6px 5px">—</td></tr></tfoot>
+      <tfoot id="tf-rend"><tr><td colspan="10" style="padding:6px 5px">—</td></tr></tfoot>
     </table></div>
   </div>
 </div>
@@ -305,6 +321,8 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="ct">📊 Estado financiero</div>
     <div class="er"><span class="el">Saldo anterior</span><span style="font-weight:600">$6.022.380</span></div>
     <div class="er"><span class="el" style="padding-left:10px">Ingresos por cobros</span><span style="color:#1a7a4a;font-weight:600" id="ef-ing">$0</span></div>
+    <div class="er" style="font-size:11px;padding:4px 0 4px 22px;border-bottom:none"><span class="el" style="color:#aaa">↳ Capital</span><span style="color:#1a7a4a" id="ef-ing-cap">$0</span></div>
+    <div class="er" style="font-size:11px;padding:4px 0 4px 22px"><span class="el" style="color:#aaa">↳ Interés</span><span style="color:#e53935" id="ef-ing-int">$0</span></div>
     <div class="er"><span class="el" style="padding-left:10px">Cheque diferido Morales (vto 12/06)</span><span style="color:#f57c00;font-weight:600">$711.892</span></div>
     <div class="er"><span class="el" style="font-weight:700">Total ingreso</span><span style="color:#1a7a4a;font-weight:700" id="ef-toting">$0</span></div>
     <div class="er"><span class="el">Egresos del período</span><span style="color:#e53935;font-weight:600" id="ef-egr">$0</span></div>
@@ -357,7 +375,15 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <label class="per-item ext"><input type="checkbox" name="me-per" value="ju_ext"> Jun ext</label>
   <label class="per-item otro"><input type="checkbox" name="me-per" value="otro"> Otro</label>
 </div></div>
-    <div class="fg"><label>Monto ($)</label><input type="number" id="me-m" inputmode="numeric"></div>
+    <div class="fg" id="me-interes-wrap">
+      <label>Capital e interés por período (editable a mano)</label>
+      <div id="me-interes-periodos"></div>
+      <button type="button" class="btn-sm" style="width:100%;background:#fff;border-color:#1565c0;color:#1565c0;font-weight:700;margin-top:2px" onclick="recalcularInteresPeriodosEdit()">📐 Sugerir interés (4% Art. 8) — opcional</button>
+    </div>
+    <div class="fg">
+      <label>Monto total cobrado ($) — se calcula solo</label>
+      <input type="number" id="me-m" inputmode="numeric" readonly value="0" style="background:#f0f2f5;font-weight:700;color:#1a7a4a">
+    </div>
     <div class="fg"><label>Forma</label><select id="me-f"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
     <div class="fg"><label>N° Recibo</label><input type="text" id="me-r"></div>
     <div class="fg"><label>Fecha</label><input type="text" id="me-d"></div>
@@ -720,6 +746,7 @@ async function cargarTodosCobros(){
     } catch(e){ /* mes sin datos */ }
   }
   renderDeu();
+  if(window.actualizarDeudaPreview) window.actualizarDeudaPreview();
 }
 
 function listenCobros(){
@@ -771,11 +798,15 @@ function renderCob(){
   
   const pag = Object.keys(cobPorLote).length;
   const tot = COBROS.reduce((s,c)=>s+c.monto,0);
+  const totInt = COBROS.reduce((s,c)=>s+(c.interes||0),0);
+  const totCap = tot - totInt;
   const pct = Math.round(pag/84*100);
   document.getElementById('m-pag').textContent=pag;
   document.getElementById('m-pen').textContent=84-pag;
   document.getElementById('m-tot').textContent=fa(tot);
   document.getElementById('m-pct').textContent=pct+'%';
+  document.getElementById('m-cap').textContent=fa(totCap);
+  document.getElementById('m-int').textContent=fa(totInt);
   document.getElementById('prog').style.width=pct+'%';
   document.getElementById('prog-t').textContent=pag+' de 84 lotes con cobros';
 
@@ -789,12 +820,21 @@ function renderCob(){
       ext?`<span style="color:#1a7a4a;font-size:11px">Ext: ${fa(ext)}</span>`:'',
       car?`<span style="color:#e65100;font-size:11px">Cargo: ${fa(car)}</span>`:'',
     ].filter(Boolean).join('&nbsp;&nbsp;');
+    const intPerLote = {};
+    cobs.forEach(c=>{ if(c.interesPer) Object.entries(c.interesPer).forEach(([k,v])=>{ intPerLote[k]=(intPerLote[k]||0)+v; }); });
+    const intLote = Object.values(intPerLote).reduce((s,v)=>s+v,0);
+    const capLote = cobs.reduce((s,c)=>s+c.monto,0) - intLote;
+    const intDetalle = Object.entries(intPerLote).map(([k,v])=>`${PERIOD_LABELS[k]||k}: ${fa(v)}`).join(' · ');
+    const capInt = ok?`<div class="lc-sub" style="margin-top:2px">
+      <span style="color:#1a7a4a;font-size:11px">💰 Capital: ${fa(capLote)}</span>${intLote?`&nbsp;&nbsp;<span style="color:#e53935;font-size:11px">📐 Interés: ${fa(intLote)} (${intDetalle})</span>`:''}
+    </div>`:'';
     const btns=cobs.map(c=>`<button class="btn-sm btn-ed" onclick="abrirEditCob(${b.n},'${c._id}')" title="${tipoL(c.conc)}">✏️</button><button class="btn-sm btn-dl" onclick="elimCob('${c._id}')">🗑</button>`).join(' ');
     return `<div class="lc ${ok?'pag':'pen'}">
       <div class="lc-top">
         <div class="lc-left">
           <div class="lc-name">${b.l}&nbsp;&nbsp;<span style="font-weight:400">${b.p}</span></div>
           <div class="lc-sub">${ok?conceptos:'<span style="color:#e53935">Sin cobros</span>'}</div>
+          ${capInt}
         </div>
         <div style="text-align:right">
           ${ok?`<div class="lc-monto" style="color:#1a7a4a">${fa(cobs.reduce((s,c)=>s+c.monto,0))}</div>`:'<div class="lc-monto" style="color:#ccc;font-size:12px">—</div>'}
@@ -823,13 +863,30 @@ window.registrar = async () => {
   btn.disabled=true; btn.textContent='Guardando...';
   try {
     const n = parseInt(document.getElementById('sl').value);
-    const monto = parseInt(document.getElementById('im').value)||0;
     const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value);
+    const periodosSinOtro = per.filter(p=>p!=='otro');
+    const claves = periodosSinOtro.length ? periodosSinOtro : ['otro'];
+    const capitalPer = {}, interesPer = {};
+    claves.forEach(p=>{
+      const ci = document.getElementById('cap-per-'+p);
+      const ii = document.getElementById('int-per-'+p);
+      const cv = ci ? (parseInt(ci.value)||0) : 0;
+      const iv = ii ? (parseInt(ii.value)||0) : 0;
+      if(cv) capitalPer[p]=cv;
+      if(iv) interesPer[p]=iv;
+    });
+    const interes = Object.values(interesPer).reduce((s,v)=>s+v,0);
+    const capitalTot = Object.values(capitalPer).reduce((s,v)=>s+v,0);
+    const monto = capitalTot + interes;
+    if(!monto){ toast('⚠️ Ingresá capital y/o interés antes de registrar'); btn.disabled=false; btn.textContent='✓ Registrar cobro'; return; }
     const cobro = {
       n,
       conc: document.getElementById('sc').value,
       per,
       monto,
+      interes,
+      interesPer,
+      capitalPer,
       forma: document.getElementById('sf').value,
       recibo: document.getElementById('ir').value||'—',
       fecha: document.getElementById('id').value||'',
@@ -840,11 +897,15 @@ window.registrar = async () => {
 
     // renderDeu cruza con COBROS en tiempo real, no hace falta modificar DEU[]
     const loteInfo = LB.find(x=>x.n===n);
+    const detInt = Object.entries(interesPer).map(([k,v])=>`${PERIOD_LABELS[k]||k} ${fa(v)}`).join(', ');
     toast(`✅ Cobro registrado · ${loteInfo?loteInfo.l:''}`);
-    registrarActividad(`Registró cobro: ${loteInfo?loteInfo.l+' - '+loteInfo.p:''} · ${fa(monto)} · ${cobro.conc} · ${per}`);
-    ['im','iob','ilemon'].forEach(id=>document.getElementById(id).value='');
+    registrarActividad(`Registró cobro: ${loteInfo?loteInfo.l+' - '+loteInfo.p:''} · ${fa(monto)}${interes?` (Cap ${fa(capitalTot)} + Int ${fa(interes)}: ${detInt})`:''} · ${cobro.conc} · ${per}`);
+    ['iob','ilemon'].forEach(id=>document.getElementById(id).value='');
     document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
     document.getElementById('ir').value='';
+    document.getElementById('interes-periodos').innerHTML='';
+    window.renderInteresPeriodos();
+    window.actualizarDeudaPreview();
   } catch(e){ toast('❌ Error: '+e.message); }
   btn.disabled=false; btn.textContent='✓ Registrar cobro';
 };
@@ -867,6 +928,9 @@ window.importar = async () => {
           n: parseInt(c.n),
           conc: c.conc||'ordinaria',
           monto: parseInt(c.monto)||0,
+          interes: parseInt(c.interes)||0,
+          interesPer: c.interesPer||{},
+          capitalPer: c.capitalPer||{},
           forma: c.forma||'Efectivo',
           recibo: c.recibo||'—',
           fecha: c.fecha||'',
@@ -910,6 +974,8 @@ window.abrirEditCob = (n,id) => {
   document.getElementById('me-d').value=c.fecha||'';
   document.getElementById('me-t').value=c.transf||'';
   document.getElementById('me-o').value=c.obs||'';
+  document.getElementById('me-interes-periodos').innerHTML='';
+  window.renderInteresPeriodosEdit({capitalPer:c.capitalPer||{}, interesPer:c.interesPer||{}});
   document.getElementById('mod-cob').style.display='block';
 };
 
@@ -918,11 +984,29 @@ window.guardarCobro = async () => {
   const btn=document.getElementById('btn-se');
   btn.disabled=true; btn.textContent='Guardando...';
   try {
+    const perSel = Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value);
+    const periodosSinOtro = perSel.filter(p=>p!=='otro');
+    const claves = periodosSinOtro.length ? periodosSinOtro : ['otro'];
+    const capitalPer = {}, interesPer = {};
+    claves.forEach(p=>{
+      const ci = document.getElementById('me-cap-per-'+p);
+      const ii = document.getElementById('me-int-per-'+p);
+      const cv = ci ? (parseInt(ci.value)||0) : 0;
+      const iv = ii ? (parseInt(ii.value)||0) : 0;
+      if(cv) capitalPer[p]=cv;
+      if(iv) interesPer[p]=iv;
+    });
+    const interes = Object.values(interesPer).reduce((s,v)=>s+v,0);
+    const capitalTot = Object.values(capitalPer).reduce((s,v)=>s+v,0);
+    const monto = capitalTot + interes;
     await setDoc(doc(db,colC(),_editCobId),{
       n:_editCobN,
       conc:document.getElementById('me-c').value,
-      per: Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value),
-      monto:parseInt(document.getElementById('me-m').value)||0,
+      per: perSel,
+      monto,
+      interes,
+      interesPer,
+      capitalPer,
       forma:document.getElementById('me-f').value,
       recibo:document.getElementById('me-r').value||'—',
       fecha:document.getElementById('me-d').value||'',
@@ -959,7 +1043,7 @@ function renderRend(){
     porLote[n].push(c);
   });
 
-  let rows='', sO=0,sE=0,sC=0,sT=0;
+  let rows='', sO=0,sE=0,sC=0,sI=0,sT=0;
   
   // Ordenar por número de lote
   Object.keys(porLote).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(key=>{
@@ -970,10 +1054,14 @@ function renderRend(){
     const cobs=porLote[n];
     const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+c.monto,0);
     const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
+    const int=cobs.reduce((s,c)=>s+(c.interes||0),0);
     const tot=ord+ext+car;
-    sO+=ord;sE+=ext;sC+=car;sT+=tot;
+    sO+=ord;sE+=ext;sC+=car;sI+=int;sT+=tot;
     const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
     const fecha=cobs[0].fecha||'—';
+    const intPerLote={};
+    cobs.forEach(c=>{ if(c.interesPer) Object.entries(c.interesPer).forEach(([k,v])=>{ intPerLote[k]=(intPerLote[k]||0)+v; }); });
+    const intTitle=Object.entries(intPerLote).map(([k,v])=>`${PERIOD_LABELS[k]||k}: ${fa(v)}`).join(' · ');
     rows+=`<tr style="border-bottom:.5px solid #f0f0f0">
       <td style="padding:5px 4px;font-size:10px">${b.n}</td>
       <td style="padding:5px 4px"><span style="font-size:10px;font-weight:700;color:#14603a;background:#e8f5ee;padding:1px 5px;border-radius:4px">${b.l}</span></td>
@@ -981,18 +1069,20 @@ function renderRend(){
       <td class="num" style="padding:5px 4px;font-weight:${ord?700:400};color:${ord?'#1565c0':'#ccc'}">${ord?fa(ord):'—'}</td>
       <td class="num" style="padding:5px 4px;font-weight:${ext?700:400};color:${ext?'#1a7a4a':'#ccc'}">${ext?fa(ext):'—'}</td>
       <td class="num" style="padding:5px 4px;font-weight:${car?700:400};color:${car?'#e65100':'#ccc'}">${car?fa(car):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${int?700:400};color:${int?'#e53935':'#ccc'}"${intTitle?` title="${intTitle}"`:''}>${int?fa(int):'—'}</td>
       <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${recs}</td>
       <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${fecha}</td>
       <td class="num" style="padding:5px 4px;font-weight:700;color:#1a7a4a;font-size:12px">${fa(tot)}</td>
     </tr>`;
   });
 
-  document.getElementById('tb-rend').innerHTML = rows||`<tr><td colspan="9" style="text-align:center;color:#aaa;padding:16px">Sin cobros en ${MES_NOM}</td></tr>`;
+  document.getElementById('tb-rend').innerHTML = rows||`<tr><td colspan="10" style="text-align:center;color:#aaa;padding:16px">Sin cobros en ${MES_NOM}</td></tr>`;
   document.getElementById('tf-rend').innerHTML=`<tr style="background:#f5f5f5;font-weight:700;font-size:11px">
     <td colspan="3" style="padding:6px 4px">Total</td>
     <td class="num" style="padding:6px 4px;color:#1565c0">${sO?fa(sO):'—'}</td>
     <td class="num" style="padding:6px 4px;color:#1a7a4a">${sE?fa(sE):'—'}</td>
     <td class="num" style="padding:6px 4px;color:#e65100">${sC?fa(sC):'—'}</td>
+    <td class="num" style="padding:6px 4px;color:#e53935">${sI?fa(sI):'—'}</td>
     <td colspan="2"></td>
     <td class="num" style="padding:6px 4px;color:#1a7a4a">${fa(sT)}</td>
   </tr>`;
@@ -1116,6 +1206,9 @@ window.elimEgr = async id => {
 };
 
 // DEUDORES — cruza DEU[] con COBROS reales de Firebase
+const PERIODOS_ORD = [{k:'oe',label:'Ene ord'},{k:'ob',label:'Feb ord'},{k:'or',label:'Mar ord'},{k:'oa',label:'Abr ord'},{k:'oy',label:'May ord'},{k:'ju_ord',label:'Jun ord'}];
+const PERIODOS_EXT = [{k:'xr',label:'Mar ext'},{k:'xa',label:'Abr ext'},{k:'xy',label:'May ext'},{k:'ju_ext',label:'Jun ext'}];
+
 function calcDeudaEfectiva(d){
   const loteInfo = LB.find(x=>x.l===d.l);
   if(!loteInfo) return {...d};
@@ -1125,11 +1218,26 @@ function calcDeudaEfectiva(d){
   const pagadoPor = {};
   cobrosLote.forEach(c=>{
     // per puede ser string (legacy) o array (nuevo)
-    const peres = Array.isArray(c.per) ? c.per : (c.per ? [c.per] : []);
+    const peres = (Array.isArray(c.per) ? c.per : (c.per ? [c.per] : [])).filter(p=>p && p!=='otro');
+    if(!peres.length) return;
+    if(c.capitalPer && Object.keys(c.capitalPer).length){
+      // El administrador tipeó el capital de cada período a mano: usar esos valores tal cual.
+      peres.forEach(p=>{
+        if(c.capitalPer[p]!==undefined) pagadoPor[p] = (pagadoPor[p]||0) + c.capitalPer[p];
+      });
+      return;
+    }
+    // Cobros antiguos sin desglose explícito de capital por período: se estima
+    // repartiendo el capital total (monto - interés) en partes iguales.
+    // Solo el CAPITAL del cobro descuenta la deuda de capital (el interés es un
+    // cargo aparte y no debe restarse de la cuota adeudada).
+    const totalInteres = c.interesPer
+      ? Object.values(c.interesPer).reduce((s,v)=>s+v,0)
+      : (c.interes||0);
+    const totalCapital = Math.max(0, (c.monto||0) - totalInteres);
+    const capitalPorPeriodo = totalCapital / peres.length;
     peres.forEach(p=>{
-      if(p && p!=='otro'){
-        pagadoPor[p] = (pagadoPor[p]||0) + (c.monto||0);
-      }
+      pagadoPor[p] = (pagadoPor[p]||0) + capitalPorPeriodo;
     });
   });
   const r = {...d};
@@ -1140,6 +1248,228 @@ function calcDeudaEfectiva(d){
   });
   return r;
 }
+
+// Devuelve, para un lote y concepto, los períodos con deuda pendiente (deuda ya
+// descontada de los cobros existentes), ordenados del más antiguo al más nuevo.
+function getDeudaLotePeriodos(n, conc){
+  const loteInfo = LB.find(x=>x.n===n);
+  if(!loteInfo) return [];
+  const base = DEU.find(d=>d.l===loteInfo.l);
+  if(!base) return [];
+  const efectivo = calcDeudaEfectiva(base);
+  const lista = conc==='extraordinaria' ? PERIODOS_EXT : PERIODOS_ORD;
+  return lista.map(p=>({...p, monto: efectivo[p.k]||0})).filter(p=>p.monto>0);
+}
+
+// Vista en vivo de la deuda del lote/concepto seleccionado en "Registrar cobro"
+window.actualizarDeudaPreview = () => {
+  const monto = parseInt(document.getElementById('im').value)||0;
+  const el = document.getElementById('deuda-preview');
+  if(!el) return;
+  const n = parseInt(document.getElementById('sl').value);
+  const conc = document.getElementById('sc').value;
+  if(!n || conc==='cargo'){ el.style.display='none'; return; }
+  const periodos = getDeudaLotePeriodos(n, conc);
+  const condLabel = conc==='extraordinaria'?'extraordinaria':'ordinaria';
+  el.style.display='block';
+  if(!periodos.length){
+    el.innerHTML = `<span style="font-size:11px;color:#1a7a4a;font-weight:700">✓ Sin deuda pendiente de expensa ${condLabel}</span>`;
+    return;
+  }
+  const total = periodos.reduce((s,p)=>s+p.monto,0);
+  const restante = Math.max(0, total - monto);
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:4px">⚠️ Deuda ${condLabel} pendiente: ${fa(total)}</div>
+    <div style="font-size:10px;color:#888;margin-bottom:6px">${periodos.map(p=>`${p.label}: ${fa(p.monto)}`).join(' · ')}</div>
+    ${monto?`<div style="font-size:10px;color:#555;margin-bottom:6px">Después de este cobro quedaría debiendo: <b>${fa(restante)}</b></div>`:''}
+    <button type="button" class="btn-sm" style="width:100%;background:#fff;border-color:#f9a825;padding:7px;font-weight:700" onclick="autocompletarPeriodos()">✨ Marcar períodos pendientes según el monto</button>
+  `;
+};
+
+// Etiquetas de período reutilizadas en todo el módulo de interés
+const PERIOD_LABELS = {otro:'General'};
+[...PERIODOS_ORD, ...PERIODOS_EXT].forEach(p=>PERIOD_LABELS[p.k]=p.label);
+
+const HEAD_CAP_INT = `<div style="display:flex;gap:6px;font-size:9px;color:#aaa;margin-bottom:2px;padding-left:66px"><span style="flex:1">Capital</span><span style="flex:1">Interés</span></div>`;
+
+// Fila editable de Capital + Interés para un período (o "General" si no hay período tildado)
+function filaCapInt(label, capId, capVal, intId, intVal, onCambio){
+  return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+    <span style="font-size:11px;color:#555;width:60px;flex-shrink:0">${label}</span>
+    <input type="number" id="${capId}" inputmode="numeric" placeholder="0" value="${capVal||0}" oninput="${onCambio}" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+    <input type="number" id="${intId}" inputmode="numeric" placeholder="0" value="${intVal||0}" oninput="${onCambio}" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+  </div>`;
+}
+
+// Muestra, para cada período tildado en "Períodos que cancela", un input de Capital
+// y un input de Interés (ambos editables a mano). El capital se prellena con la
+// deuda pendiente real de ese período como sugerencia, pero se puede sobrescribir.
+// Si no hay ningún período tildado, muestra una fila "General" para pagos sueltos.
+window.renderInteresPeriodos = () => {
+  const n = parseInt(document.getElementById('sl').value);
+  const conc = document.getElementById('sc').value;
+  const deudaPorPeriodo = {};
+  if(n && conc!=='cargo') getDeudaLotePeriodos(n, conc).forEach(p=>deudaPorPeriodo[p.k]=p.monto);
+
+  const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  const cont = document.getElementById('interes-periodos');
+  if(!per.length){
+    const prevCap = document.getElementById('cap-per-otro'); const prevInt = document.getElementById('int-per-otro');
+    cont.innerHTML = HEAD_CAP_INT + filaCapInt('General', 'cap-per-otro', prevCap?prevCap.value:0, 'int-per-otro', prevInt?prevInt.value:0, 'actualizarTotalesInteres()');
+    actualizarTotalesInteres();
+    return;
+  }
+  cont.innerHTML = HEAD_CAP_INT + per.map(p=>{
+    const prevCap = document.getElementById('cap-per-'+p);
+    const prevInt = document.getElementById('int-per-'+p);
+    const capDefault = prevCap ? prevCap.value : (deudaPorPeriodo[p]!==undefined ? deudaPorPeriodo[p] : 0);
+    const intDefault = prevInt ? prevInt.value : 0;
+    return filaCapInt(PERIOD_LABELS[p]||p, 'cap-per-'+p, capDefault, 'int-per-'+p, intDefault, 'actualizarTotalesInteres()');
+  }).join('');
+  actualizarTotalesInteres();
+};
+
+// Suma los capital/interés tipeados (por período, o el campo general) y
+// calcula el Monto total cobrado automáticamente — no hay que tipearlo a mano.
+window.actualizarTotalesInteres = () => {
+  const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  let totCap=0, totInt=0;
+  const claves = per.length ? per : ['otro'];
+  claves.forEach(p=>{
+    const c=document.getElementById('cap-per-'+p); if(c) totCap+=parseInt(c.value)||0;
+    const i=document.getElementById('int-per-'+p); if(i) totInt+=parseInt(i.value)||0;
+  });
+  document.getElementById('im').value = totCap+totInt;
+  window.actualizarDeudaPreview();
+};
+
+// Calcula el interés punitorio (Art. 8, 4% mensual) de cada período tildado,
+// a la fecha de cobro indicada, y completa el input correspondiente a ESE período.
+// Es un ATAJO opcional: el capital y el interés siempre se pueden tipear a mano.
+window.recalcularInteresPeriodos = () => {
+  const n = parseInt(document.getElementById('sl').value);
+  const fechaStr = document.getElementById('id').value;
+  const m = fechaStr && fechaStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m){ toast('⚠️ Ingresá la fecha del cobro (dd/mm/aaaa) primero'); return; }
+  const fc = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]), 23,59,59);
+  const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  if(!per.length){ toast('⚠️ Marcá primero los períodos que cancela'); return; }
+  const loteInfo = LB.find(x=>x.n===n);
+  const base = loteInfo && DEU.find(x=>x.l===loteInfo.l);
+  if(!base){ toast('⚠️ Lote sin deuda cargada'); return; }
+  const d = calcDeudaEfectiva(base);
+  const td = 0.04/30;
+  MI.forEach(mi=>{
+    [mi.co, mi.cx].forEach(campo=>{
+      if(!campo || !per.includes(campo)) return;
+      const cap = d[campo]||0;
+      const el = document.getElementById('int-per-'+campo);
+      if(!el) return;
+      if(!cap || fc<mi.venc){ el.value=0; return; }
+      const dias = Math.floor((fc-mi.venc)/86400000);
+      const esMesCurso = fc.getFullYear()===mi.venc.getFullYear() && fc.getMonth()===mi.venc.getMonth();
+      el.value = esMesCurso ? Math.round(cap*0.04) : Math.round(cap*td*dias);
+    });
+  });
+  actualizarTotalesInteres();
+  toast('📐 Interés sugerido calculado por período');
+};
+
+// ── Mismas funciones para el modal de edición de cobro ──
+window.renderInteresPeriodosEdit = (prefillObj) => {
+  prefillObj = prefillObj || {};
+  const n = _editCobN;
+  const conc = document.getElementById('me-c').value;
+  const deudaPorPeriodo = {};
+  if(n && conc!=='cargo') getDeudaLotePeriodos(n, conc).forEach(p=>deudaPorPeriodo[p.k]=p.monto);
+
+  const per = Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  const cont = document.getElementById('me-interes-periodos');
+  if(!per.length){
+    const existCap = document.getElementById('me-cap-per-otro'); const existInt = document.getElementById('me-int-per-otro');
+    const capVal = existCap ? existCap.value : (prefillObj.capitalPer && prefillObj.capitalPer['otro']!==undefined ? prefillObj.capitalPer['otro'] : 0);
+    const intVal = existInt ? existInt.value : (prefillObj.interesPer && prefillObj.interesPer['otro']!==undefined ? prefillObj.interesPer['otro'] : 0);
+    cont.innerHTML = HEAD_CAP_INT + filaCapInt('General', 'me-cap-per-otro', capVal, 'me-int-per-otro', intVal, 'actualizarTotalesInteresEdit()');
+    actualizarTotalesInteresEdit();
+    return;
+  }
+  cont.innerHTML = HEAD_CAP_INT + per.map(p=>{
+    const existCap = document.getElementById('me-cap-per-'+p); const existInt = document.getElementById('me-int-per-'+p);
+    const capVal = existCap ? existCap.value : (prefillObj.capitalPer && prefillObj.capitalPer[p]!==undefined ? prefillObj.capitalPer[p] : (deudaPorPeriodo[p]!==undefined ? deudaPorPeriodo[p] : 0));
+    const intVal = existInt ? existInt.value : (prefillObj.interesPer && prefillObj.interesPer[p]!==undefined ? prefillObj.interesPer[p] : 0);
+    return filaCapInt(PERIOD_LABELS[p]||p, 'me-cap-per-'+p, capVal, 'me-int-per-'+p, intVal, 'actualizarTotalesInteresEdit()');
+  }).join('');
+  actualizarTotalesInteresEdit();
+};
+
+window.actualizarTotalesInteresEdit = () => {
+  const per = Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  let totCap=0, totInt=0;
+  const claves = per.length ? per : ['otro'];
+  claves.forEach(p=>{
+    const c=document.getElementById('me-cap-per-'+p); if(c) totCap+=parseInt(c.value)||0;
+    const i=document.getElementById('me-int-per-'+p); if(i) totInt+=parseInt(i.value)||0;
+  });
+  document.getElementById('me-m').value = totCap+totInt;
+};
+
+window.recalcularInteresPeriodosEdit = () => {
+  const n = _editCobN;
+  const fechaStr = document.getElementById('me-d').value;
+  const m = fechaStr && fechaStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m){ toast('⚠️ Ingresá la fecha del cobro (dd/mm/aaaa) primero'); return; }
+  const fc = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]), 23,59,59);
+  const per = Array.from(document.querySelectorAll('input[name="me-per"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+  if(!per.length){ toast('⚠️ Marcá primero los períodos que cancela'); return; }
+  const loteInfo = LB.find(x=>x.n===n);
+  const base = loteInfo && DEU.find(x=>x.l===loteInfo.l);
+  if(!base){ toast('⚠️ Lote sin deuda cargada'); return; }
+  const d = calcDeudaEfectiva(base);
+  const td = 0.04/30;
+  MI.forEach(mi=>{
+    [mi.co, mi.cx].forEach(campo=>{
+      if(!campo || !per.includes(campo)) return;
+      const cap = d[campo]||0;
+      const el = document.getElementById('me-int-per-'+campo);
+      if(!el) return;
+      if(!cap || fc<mi.venc){ el.value=0; return; }
+      const dias = Math.floor((fc-mi.venc)/86400000);
+      const esMesCurso = fc.getFullYear()===mi.venc.getFullYear() && fc.getMonth()===mi.venc.getMonth();
+      el.value = esMesCurso ? Math.round(cap*0.04) : Math.round(cap*td*dias);
+    });
+  });
+  actualizarTotalesInteresEdit();
+  toast('📐 Interés sugerido recalculado por período');
+};
+
+// Cada vez que se tilda/destilda un período, se actualiza el desglose de capital/interés
+document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.addEventListener('change', ()=>window.renderInteresPeriodos()));
+document.querySelectorAll('input[name="me-per"]').forEach(cb=>cb.addEventListener('change', ()=>window.renderInteresPeriodosEdit()));
+
+
+// Marca automáticamente, entre los períodos pendientes, los más antiguos que
+// el monto ingresado alcanza a cubrir (descuento automático de deuda).
+window.autocompletarPeriodos = () => {
+  const n = parseInt(document.getElementById('sl').value);
+  const conc = document.getElementById('sc').value;
+  const monto = parseInt(document.getElementById('im').value)||0;
+  if(!monto){ toast('⚠️ Ingresá primero el monto del cobro'); return; }
+  const periodos = getDeudaLotePeriodos(n, conc);
+  document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
+  let restante = monto, marcados = [];
+  for(const p of periodos){
+    if(restante <= 0) break;
+    const cb = document.querySelector(`input[name="sper"][value="${p.k}"]`);
+    if(cb){ cb.checked = true; marcados.push(p.label); }
+    restante -= p.monto;
+  }
+  if(marcados.length){
+    toast('✨ Marcado: '+marcados.join(', ')+(restante>0?` · Quedan ${fa(restante)} sin asignar a ningún período`:''));
+  } else {
+    toast('⚠️ No hay períodos pendientes para marcar con ese concepto');
+  }
+  window.actualizarDeudaPreview();
+};
 
 function renderDeu(){
   const DEU_EF = DEU.map(d => calcDeudaEfectiva(d));
@@ -1475,8 +1805,11 @@ window.calcLote=()=>{
 // ESTADO
 function actualizarEstado(){
   const ing=COBROS.reduce((s,c)=>s+c.monto,0);
+  const ingInt=COBROS.reduce((s,c)=>s+(c.interes||0),0);
   const egr=EGRESOS.reduce((s,e)=>s+e.m,0);
   document.getElementById('ef-ing').textContent=fa(ing);
+  document.getElementById('ef-ing-cap').textContent=fa(ing-ingInt);
+  document.getElementById('ef-ing-int').textContent=fa(ingInt);
   document.getElementById('ef-toting').textContent=fa(ing+711892);
   document.getElementById('ef-egr').textContent=fa(egr);
   document.getElementById('ef-saldo').textContent=fa(6022380+ing+711892-egr);
@@ -1509,7 +1842,10 @@ window.verRecibo=()=>{
       <div class="rr"><span class="rlab">Lote</span><span>${b.l}</span></div>
       <div class="rr"><span class="rlab">Fecha</span><span>${cobs[0].fecha||'—'}</span></div>
       <div class="rr"><span class="rlab">Forma</span><span>${cobs[0].forma||'—'}</span></div>
-      ${cobs.map(c=>`<div class="rr"><span class="rlab">${tipoL(c.conc)}${c.obs?' ('+c.obs+')':''}</span><span style="font-weight:700">${fa(c.monto)}</span></div>`).join('')}
+      ${cobs.map(c=>{
+        const det = c.interes ? `<br><span style="font-size:9px;color:#888;font-weight:400">Capital ${fa(c.monto-c.interes)} + Interés ${fa(c.interes)}</span>` : '';
+        return `<div class="rr"><span class="rlab">${tipoL(c.conc)}${c.obs?' ('+c.obs+')':''}</span><span style="font-weight:700;text-align:right">${fa(c.monto)}${det}</span></div>`;
+      }).join('')}
       <div class="rtot"><span>Total abonado</span><span>${fa(tot)}</span></div>
       <div class="rfirma">Contadora: Juana B. Varvaro · CPN · M.P 7450 - C.G.C.E.T.</div>
     </div></div>`;
@@ -1980,6 +2316,7 @@ listenCobros();
 listenEgresos();
 cargarTodosCobros();
 if(USER_ACTUAL) listenActividad();
+window.actualizarDeudaPreview();
 </script>
 </body>
 </html>
