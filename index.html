@@ -813,7 +813,9 @@ function renderCob(){
   document.getElementById('lista-cob').innerHTML = vis.map(b=>{
     const cobs = cobPorLote[b.n]||[];
     const ok = cobs.length>0;
-    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+c.monto,0);
+    // Ordinaria/Extraordinaria/Cargo muestran SOLO capital (el interés se ve aparte,
+    // abajo) para no duplicar esa plata entre las dos líneas de la tarjeta.
+    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
     const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
     const conceptos=[
       ord?`<span style="color:#1565c0;font-size:11px">Ord: ${fa(ord)}</span>`:'',
@@ -823,7 +825,7 @@ function renderCob(){
     const intPerLote = {};
     cobs.forEach(c=>{ if(c.interesPer) Object.entries(c.interesPer).forEach(([k,v])=>{ intPerLote[k]=(intPerLote[k]||0)+v; }); });
     const intLote = Object.values(intPerLote).reduce((s,v)=>s+v,0);
-    const capLote = cobs.reduce((s,c)=>s+c.monto,0) - intLote;
+    const capLote = ord+ext+car;
     const intDetalle = Object.entries(intPerLote).map(([k,v])=>`${PERIOD_LABELS[k]||k}: ${fa(v)}`).join(' · ');
     const capInt = ok?`<div class="lc-sub" style="margin-top:2px">
       <span style="color:#1a7a4a;font-size:11px">💰 Capital: ${fa(capLote)}</span>${intLote?`&nbsp;&nbsp;<span style="color:#e53935;font-size:11px">📐 Interés: ${fa(intLote)} (${intDetalle})</span>`:''}
@@ -1052,10 +1054,12 @@ function renderRend(){
     if(!b) return;
     if(filtR && !b.l.toLowerCase().includes(filtR) && !b.p.toLowerCase().includes(filtR)) return;
     const cobs=porLote[n];
-    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+c.monto,0);
+    // Ordinaria/Extraordinaria muestran SOLO capital (sin el interés adentro),
+    // para que la columna Interés no duplique plata que ya está contada ahí.
+    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
     const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
     const int=cobs.reduce((s,c)=>s+(c.interes||0),0);
-    const tot=ord+ext+car;
+    const tot=ord+ext+car+int;
     sO+=ord;sE+=ext;sC+=car;sI+=int;sT+=tot;
     const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
     const fecha=cobs[0].fecha||'—';
