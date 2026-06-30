@@ -227,6 +227,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <button class="btn" onclick="renderRend()" style="width:auto;padding:8px 14px;font-size:12px">🔄</button>
     </div>
   </div>
+  <button class="btn" onclick="imprimirRend()" style="background:#1565c0;width:auto;padding:8px 16px;margin-bottom:8px">🖨️ Imprimir informe</button>
   <input class="srch" type="search" placeholder="🔍 Buscar..." oninput="filtrarR(this.value)">
   <div class="card" style="padding:8px">
     <div class="tbl"><table>
@@ -235,13 +236,14 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
         <th class="num" style="min-width:70px;color:#1565c0">Ordinaria</th>
         <th class="num" style="min-width:75px;color:#1a7a4a">Extraordinaria</th>
         <th class="num" style="min-width:60px;color:#e65100">Cargo</th>
-        <th class="num" style="min-width:65px;color:#e53935">Interés</th>
+        <th class="num" style="min-width:65px;color:#e53935">Int. Ord.</th>
+        <th class="num" style="min-width:65px;color:#c62828">Int. Ext.</th>
         <th class="num" style="min-width:65px">Recibo</th>
         <th class="num" style="min-width:75px">Fecha</th>
         <th class="num" style="min-width:70px;font-weight:700;color:#222">Total</th>
       </tr></thead>
       <tbody id="tb-rend"></tbody>
-      <tfoot id="tf-rend"><tr><td colspan="10" style="padding:6px 5px">—</td></tr></tfoot>
+      <tfoot id="tf-rend"><tr><td colspan="11" style="padding:6px 5px">—</td></tr></tfoot>
     </table></div>
   </div>
 </div>
@@ -627,7 +629,7 @@ const DEU=[
   {l:'L37 Sur', p:'Orieta Daniel',            oe:70000,ob:70000,or:70000,oa:90000,oy:90000,xr:0,xa:95000,xy:95000},
   {l:'L38 Sur', p:'Garcia Fernanda',          oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:95000,xy:95000},
   {l:'L39 Sur', p:'Zelaya Hugo',              oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:0,   xy:95000},
-  {l:'L40 Sur', p:'Zelaya Hernan Gabriel',    oe:0,ob:70000,or:70000,oa:70000,oy:90000,xr:0,xa:90000,xy:95000},
+  {l:'L40 Sur', p:'Zelaya Hernan Gabriel',    oe:0,ob:0,or:70000,oa:90000,oy:90000,xr:0,xa:95000,xy:95000},
   // --- NORTE ---
   {l:'L1 Norte',p:'Figueroa Jose Gustavo',    oe:0,ob:0,or:0,oa:0,oy:0,  xr:0,xa:0,   xy:95000},
   {l:'L2 Norte',p:'Padilla Maria Josefina',   oe:0,ob:0,or:0,oa:560,oy:90000,xr:0,xa:95000,xy:95000},
@@ -649,7 +651,7 @@ const DEU=[
   {l:'L18 Norte',p:'Ponce Giselle',           oe:0,ob:0,or:0,oa:0,oy:0,  xr:0,xa:0,   xy:11152},
   {l:'L19 Norte',p:'Pacheco Eliana',          oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:0,  xy:95000},
   {l:'L20 Norte',p:'Nadal Jose',              oe:70000,ob:70000,or:70000,oa:90000,oy:90000,xr:0,xa:95000,xy:95000},
-  {l:'L21 Norte',p:'Nader Carlos',            oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:0,  xy:95000},
+  {l:'L21 Norte',p:'Nader Carlos',            oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:10573,xy:95000},
   {l:'L22 Norte',p:'Ramos Eduardo',           oe:0,ob:0,or:0,oa:0,oy:3800, xr:0,xa:0,  xy:95000},
   {l:'L23 Norte',p:'Luna Belen',              oe:0,ob:0,or:0,oa:0,oy:90000,xr:0,xa:0,  xy:95000},
   {l:'L24 Norte',p:'Gutierrez Jose',          oe:0,ob:0,or:0,oa:0,oy:0,  xr:0,xa:0,   xy:0},
@@ -1045,7 +1047,7 @@ function renderRend(){
     porLote[n].push(c);
   });
 
-  let rows='', sO=0,sE=0,sC=0,sI=0,sT=0;
+  let rows='', sO=0,sE=0,sC=0,sIo=0,sIe=0,sT=0;
   
   // Ordenar por número de lote
   Object.keys(porLote).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(key=>{
@@ -1055,12 +1057,14 @@ function renderRend(){
     if(filtR && !b.l.toLowerCase().includes(filtR) && !b.p.toLowerCase().includes(filtR)) return;
     const cobs=porLote[n];
     // Ordinaria/Extraordinaria muestran SOLO capital (sin el interés adentro),
-    // para que la columna Interés no duplique plata que ya está contada ahí.
+    // para que las columnas de Interés no dupliquen plata que ya está contada ahí.
     const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
     const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
-    const int=cobs.reduce((s,c)=>s+(c.interes||0),0);
-    const tot=ord+ext+car+int;
-    sO+=ord;sE+=ext;sC+=car;sI+=int;sT+=tot;
+    // Interés separado: el de cobros de ordinaria vs el de cobros de extraordinaria
+    const intOrd=cobs.filter(c=>c.conc==='ordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    const intExt=cobs.filter(c=>c.conc==='extraordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    const tot=ord+ext+car+intOrd+intExt;
+    sO+=ord;sE+=ext;sC+=car;sIo+=intOrd;sIe+=intExt;sT+=tot;
     const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
     const fecha=cobs[0].fecha||'—';
     const intPerLote={};
@@ -1073,20 +1077,22 @@ function renderRend(){
       <td class="num" style="padding:5px 4px;font-weight:${ord?700:400};color:${ord?'#1565c0':'#ccc'}">${ord?fa(ord):'—'}</td>
       <td class="num" style="padding:5px 4px;font-weight:${ext?700:400};color:${ext?'#1a7a4a':'#ccc'}">${ext?fa(ext):'—'}</td>
       <td class="num" style="padding:5px 4px;font-weight:${car?700:400};color:${car?'#e65100':'#ccc'}">${car?fa(car):'—'}</td>
-      <td class="num" style="padding:5px 4px;font-weight:${int?700:400};color:${int?'#e53935':'#ccc'}"${intTitle?` title="${intTitle}"`:''}>${int?fa(int):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${intOrd?700:400};color:${intOrd?'#e53935':'#ccc'}"${intTitle?` title="${intTitle}"`:''}>${intOrd?fa(intOrd):'—'}</td>
+      <td class="num" style="padding:5px 4px;font-weight:${intExt?700:400};color:${intExt?'#c62828':'#ccc'}"${intTitle?` title="${intTitle}"`:''}>${intExt?fa(intExt):'—'}</td>
       <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${recs}</td>
       <td class="num" style="padding:5px 4px;font-size:10px;color:#888">${fecha}</td>
       <td class="num" style="padding:5px 4px;font-weight:700;color:#1a7a4a;font-size:12px">${fa(tot)}</td>
     </tr>`;
   });
 
-  document.getElementById('tb-rend').innerHTML = rows||`<tr><td colspan="10" style="text-align:center;color:#aaa;padding:16px">Sin cobros en ${MES_NOM}</td></tr>`;
+  document.getElementById('tb-rend').innerHTML = rows||`<tr><td colspan="11" style="text-align:center;color:#aaa;padding:16px">Sin cobros en ${MES_NOM}</td></tr>`;
   document.getElementById('tf-rend').innerHTML=`<tr style="background:#f5f5f5;font-weight:700;font-size:11px">
     <td colspan="3" style="padding:6px 4px">Total</td>
     <td class="num" style="padding:6px 4px;color:#1565c0">${sO?fa(sO):'—'}</td>
     <td class="num" style="padding:6px 4px;color:#1a7a4a">${sE?fa(sE):'—'}</td>
     <td class="num" style="padding:6px 4px;color:#e65100">${sC?fa(sC):'—'}</td>
-    <td class="num" style="padding:6px 4px;color:#e53935">${sI?fa(sI):'—'}</td>
+    <td class="num" style="padding:6px 4px;color:#e53935">${sIo?fa(sIo):'—'}</td>
+    <td class="num" style="padding:6px 4px;color:#c62828">${sIe?fa(sIe):'—'}</td>
     <td colspan="2"></td>
     <td class="num" style="padding:6px 4px;color:#1a7a4a">${fa(sT)}</td>
   </tr>`;
@@ -2188,6 +2194,82 @@ window.imprimirDeu=()=>{
     </tr></tfoot>
   </table>
   <div style="margin-top:40px;font-size:10px;color:#aaa;text-align:center">
+    Generado el ${fecha} · Consorcio Barrio Las Palmas · Contadora: Juana B. Varvaro CPN M.P 7450
+  </div>
+  </body></html>`);
+  w.document.close();
+};
+
+window.imprimirRend=()=>{
+  const fecha=new Date().toLocaleDateString('es-AR');
+  const porLote={};
+  COBROS.forEach(c=>{ const n=parseInt(c.n); if(!porLote[n]) porLote[n]=[]; porLote[n].push(c); });
+  let filas='', sO=0,sE=0,sC=0,sIo=0,sIe=0,sT=0;
+  Object.keys(porLote).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(key=>{
+    const n=parseInt(key);
+    const b=LB.find(x=>x.n===n);
+    if(!b) return;
+    const cobs=porLote[n];
+    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
+    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
+    const intOrd=cobs.filter(c=>c.conc==='ordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    const intExt=cobs.filter(c=>c.conc==='extraordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    const tot=ord+ext+car+intOrd+intExt;
+    sO+=ord;sE+=ext;sC+=car;sIo+=intOrd;sIe+=intExt;sT+=tot;
+    const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
+    const fecha2=cobs[0].fecha||'—';
+    filas+=`<tr>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-weight:600">${b.l}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee">${b.p}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;color:#1565c0">${ord?fa(ord):'—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;color:#1a7a4a">${ext?fa(ext):'—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;color:#e65100">${car?fa(car):'—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;color:#e53935">${intOrd?fa(intOrd):'—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;color:#c62828">${intExt?fa(intExt):'—'}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:10px;color:#888">${recs}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;font-size:10px;color:#888">${fecha2}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#1a7a4a">${fa(tot)}</td>
+    </tr>`;
+  });
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Informe Mensual — Barrio Las Palmas</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#222}
+    h2{color:#1a7a4a;margin-bottom:4px}
+    .sub{color:#888;font-size:11px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f5f5f5;padding:7px 6px;text-align:left;font-size:10px;color:#555;border-bottom:2px solid #ddd}
+    th.r{text-align:right}
+    tfoot td{font-weight:700;padding:8px 6px;border-top:2px solid #ddd;font-size:11px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h2>Consorcio Barrio Las Palmas</h2>
+  <div class="sub">Informe mensual — ${MES_NOM} · Generado el ${fecha} · Administradores: Juan Ponce / Walter Vallejo</div>
+  <button onclick="window.print()" style="margin-bottom:12px;padding:8px 16px;background:#1a7a4a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
+  <table>
+    <thead><tr>
+      <th>Lote</th><th>Propietario</th>
+      <th class="r">Ordinaria</th><th class="r">Extraordinaria</th><th class="r">Cargo</th>
+      <th class="r">Int. Ord.</th><th class="r">Int. Ext.</th>
+      <th>Recibo</th><th>Fecha</th><th class="r">Total</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr>
+      <td colspan="2">TOTAL</td>
+      <td style="text-align:right;color:#1565c0">${fa(sO)}</td>
+      <td style="text-align:right;color:#1a7a4a">${fa(sE)}</td>
+      <td style="text-align:right;color:#e65100">${fa(sC)}</td>
+      <td style="text-align:right;color:#e53935">${fa(sIo)}</td>
+      <td style="text-align:right;color:#c62828">${fa(sIe)}</td>
+      <td colspan="2"></td>
+      <td style="text-align:right;color:#1a7a4a">${fa(sT)}</td>
+    </tr></tfoot>
+  </table>
+  <div style="margin-top:30px;font-size:9px;color:#aaa;display:flex;justify-content:space-between">
+    <span>Int. Ord.: interés generado por mora en expensas ordinarias · Int. Ext.: interés generado por mora en expensas extraordinarias</span>
+  </div>
+  <div style="margin-top:10px;font-size:10px;color:#aaa;text-align:center">
     Generado el ${fecha} · Consorcio Barrio Las Palmas · Contadora: Juana B. Varvaro CPN M.P 7450
   </div>
   </body></html>`);
