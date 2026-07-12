@@ -2272,27 +2272,60 @@ async function mostrarVerificacionPublica(codigo){
 // generar nada real: no guarda en RECIBOS, no gasta un número de la numeración
 // correlativa, no toca ningún cobro. Usa datos ficticios fijos.
 window.previsualizarReciboEjemplo = () => {
-  const loteInfoEjemplo = {l:'Lote 39 Sur', p:'Zelaya Hugo (EJEMPLO)'};
-  const conceptosEjemplo = [
-    {label:'May 2026 · Exp. Extraordinaria', cap:3293, int:237, subtotal:3530},
-    {label:'Jun 2026 · Exp. Ordinaria', cap:90000, int:2760, subtotal:92760},
-    {label:'Jun 2026 · Exp. Extraordinaria', cap:95000, int:2913, subtotal:97913},
-  ];
-  const cobroEjemplo = {monto:194203, forma:'Transferencia', fecha:new Date().toLocaleDateString('es-AR')};
-  const meta = {recibo:'0000 (ejemplo)', codigo:'LP-EJEMPLO-DEMO', urlVerificacion: location.origin+location.pathname+'#verificar/EJEMPLO', firmante:'Juan Ponce / Walter Vallejo'};
+  const n = parseInt(document.getElementById('sl').value);
+  const loteReal = LB.find(x=>x.n===n);
+
+  // Si hay un lote elegido en el formulario, arma la vista previa con los datos
+  // REALES que estén cargados ahí (monto, períodos, forma de pago, comprobante) —
+  // sigue sin guardar nada, pero ya no muestra siempre el mismo ejemplo fijo.
+  let loteInfoEjemplo, conceptosEjemplo, cobroEjemplo, esEjemploFijo = false;
+
+  if(loteReal){
+    const per = Array.from(document.querySelectorAll('input[name="sper"]:checked')).map(x=>x.value).filter(p=>p!=='otro');
+    const claves = per.length ? per : ['otro'];
+    let capitalTot = 0, interesTot = 0;
+    conceptosEjemplo = claves.map(p=>{
+      const ci = document.getElementById('cap-per-'+p);
+      const ii = document.getElementById('int-per-'+p);
+      const cap = ci ? (parseInt(ci.value)||0) : 0;
+      const int = ii ? (parseInt(ii.value)||0) : 0;
+      capitalTot += cap; interesTot += int;
+      return {label: PERIOD_LABELS[p]||p, cap, int, subtotal: cap+int};
+    }).filter(c=>c.subtotal>0);
+    loteInfoEjemplo = {l: loteReal.l, p: loteReal.p};
+    cobroEjemplo = {
+      monto: capitalTot+interesTot || (parseInt(document.getElementById('im').value)||0),
+      forma: document.getElementById('sf').value,
+      fecha: document.getElementById('id').value ? new Date(document.getElementById('id').value+'T00:00').toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'),
+      lemon: document.getElementById('ilemon').value.trim()||'',
+      comprobanteImg: window._comprobanteDataURL||''
+    };
+    if(!conceptosEjemplo.length) conceptosEjemplo = [{label:'General', cap:cobroEjemplo.monto, int:0, subtotal:cobroEjemplo.monto}];
+  } else {
+    esEjemploFijo = true;
+    loteInfoEjemplo = {l:'Lote 39 Sur', p:'Zelaya Hugo (EJEMPLO)'};
+    conceptosEjemplo = [
+      {label:'May 2026 · Exp. Extraordinaria', cap:3293, int:237, subtotal:3530},
+      {label:'Jun 2026 · Exp. Ordinaria', cap:90000, int:2760, subtotal:92760},
+      {label:'Jun 2026 · Exp. Extraordinaria', cap:95000, int:2913, subtotal:97913},
+    ];
+    cobroEjemplo = {monto:194203, forma:'Transferencia', fecha:new Date().toLocaleDateString('es-AR')};
+  }
+
+  const meta = {recibo:'0000 (vista previa)', codigo:'LP-PREVIEW-DEMO', urlVerificacion: location.origin+location.pathname+'#verificar/EJEMPLO', firmante:'Juan Ponce / Walter Vallejo'};
   const pdfDoc = construirPDFRecibo(meta, loteInfoEjemplo, conceptosEjemplo, cobroEjemplo);
   const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
-  const resumenEjemplo = `Recibo de ejemplo — ${loteInfoEjemplo.l} — ${loteInfoEjemplo.p} — Total: $${cobroEjemplo.monto.toLocaleString('es-AR')}`;
+  const resumenEjemplo = `Vista previa — ${loteInfoEjemplo.l} — ${loteInfoEjemplo.p} — Total: $${cobroEjemplo.monto.toLocaleString('es-AR')}`;
   window._pdfEjemplo = pdfDoc;
   const out = document.getElementById('recibo-digital-out');
   out.innerHTML = `
     <div class="fg" style="border:1px dashed #a9853f;border-radius:8px;padding:10px;margin-top:8px;background:#fffdf7">
-      <div style="font-size:11px;font-weight:700;color:#a9853f;margin-bottom:6px">👁️ EJEMPLO — no se guardó nada, solo para mostrar el diseño</div>
+      <div style="font-size:11px;font-weight:700;color:#a9853f;margin-bottom:6px">👁️ ${esEjemploFijo?'EJEMPLO GENÉRICO (elegí un lote arriba para ver sus datos reales)':'VISTA PREVIA de '+loteInfoEjemplo.l} — no se guardó nada</div>
       <iframe src="${blobUrl}" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px"></iframe>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
         <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick='imprimirPDF(window._pdfEjemplo)'>🖨️ Imprimir</button>
-        <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfEjemplo, "Recibo_EJEMPLO.pdf", ${JSON.stringify(resumenEjemplo)})'>📱 WhatsApp</button>
+        <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfEjemplo, "Recibo_vista_previa.pdf", ${JSON.stringify(resumenEjemplo)})'>📱 WhatsApp</button>
       </div>
     </div>`;
   out.scrollIntoView({behavior:'smooth', block:'nearest'});
