@@ -207,6 +207,8 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <label class="per-item ext"><input type="checkbox" name="sper" value="xy"> May ext</label>
   <label class="per-item ord"><input type="checkbox" name="sper" value="ju_ord"> Jun ord</label>
   <label class="per-item ext"><input type="checkbox" name="sper" value="ju_ext"> Jun ext</label>
+  <label class="per-item ord"><input type="checkbox" name="sper" value="jul_ord"> Jul ord</label>
+  <label class="per-item ext"><input type="checkbox" name="sper" value="jul_ext"> Jul ext</label>
   <label class="per-item otro"><input type="checkbox" name="sper" value="otro"> Otro</label>
 </div></div>
     <div class="fg" id="interes-wrap">
@@ -406,6 +408,8 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <label class="per-item ext"><input type="checkbox" name="me-per" value="xy"> May ext</label>
   <label class="per-item ord"><input type="checkbox" name="me-per" value="ju_ord"> Jun ord</label>
   <label class="per-item ext"><input type="checkbox" name="me-per" value="ju_ext"> Jun ext</label>
+  <label class="per-item ord"><input type="checkbox" name="me-per" value="jul_ord"> Jul ord</label>
+  <label class="per-item ext"><input type="checkbox" name="me-per" value="jul_ext"> Jul ext</label>
   <label class="per-item otro"><input type="checkbox" name="me-per" value="otro"> Otro</label>
 </div></div>
     <div class="fg" id="me-interes-wrap">
@@ -716,6 +720,7 @@ const DEU=[
 
 // Agregar deuda junio 2026 a todos los lotes
 DEU.forEach(d => { d.ju_ord = 90000; d.ju_ext = 95000; });
+DEU.forEach(d => { d.jul_ord = 90000; d.jul_ext = 95000; });
 
 // Estado global - COBROS como array simple
 let MES = '2026-05';
@@ -1299,8 +1304,8 @@ window.elimEgr = async id => {
 };
 
 // DEUDORES — cruza DEU[] con COBROS reales de Firebase
-const PERIODOS_ORD = [{k:'oe',label:'Ene ord'},{k:'ob',label:'Feb ord'},{k:'or',label:'Mar ord'},{k:'oa',label:'Abr ord'},{k:'oy',label:'May ord'},{k:'ju_ord',label:'Jun ord'}];
-const PERIODOS_EXT = [{k:'xr',label:'Mar ext'},{k:'xa',label:'Abr ext'},{k:'xy',label:'May ext'},{k:'ju_ext',label:'Jun ext'}];
+const PERIODOS_ORD = [{k:'oe',label:'Ene ord'},{k:'ob',label:'Feb ord'},{k:'or',label:'Mar ord'},{k:'oa',label:'Abr ord'},{k:'oy',label:'May ord'},{k:'ju_ord',label:'Jun ord'},{k:'jul_ord',label:'Jul ord'}];
+const PERIODOS_EXT = [{k:'xr',label:'Mar ext'},{k:'xa',label:'Abr ext'},{k:'xy',label:'May ext'},{k:'ju_ext',label:'Jun ext'},{k:'jul_ext',label:'Jul ext'}];
 
 function calcDeudaEfectiva(d){
   const loteInfo = LB.find(x=>x.l===d.l);
@@ -1334,7 +1339,7 @@ function calcDeudaEfectiva(d){
     });
   });
   const r = {...d};
-  ['oe','ob','or','oa','oy','ju_ord','xr','xa','xy','ju_ext'].forEach(campo=>{
+  ['oe','ob','or','oa','oy','ju_ord','jul_ord','xr','xa','xy','ju_ext','jul_ext'].forEach(campo=>{
     if(pagadoPor[campo]!==undefined){
       r[campo] = Math.max(0, (r[campo]||0) - pagadoPor[campo]);
     }
@@ -1567,8 +1572,8 @@ window.autocompletarPeriodos = () => {
 function renderDeu(){
   const DEU_EF = DEU.map(d => calcDeudaEfectiva(d));
   document.getElementById('lista-deu').innerHTML=DEU_EF.map(d=>{
-    const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
-    const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0);
+    const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0);
     const totGen=totOrd+totExt;
     if(!totGen) return'';
     const msMax=mesesDeuda(d);
@@ -1590,6 +1595,8 @@ function renderDeu(){
             ${d.xy?`<span style="color:#1a7a4a">May ext: ${fa(d.xy)}</span>`:''}
             ${d.ju_ord?`<span style="color:#1565c0">Jun ord: ${fa(d.ju_ord)}</span>`:''}
             ${d.ju_ext?`<span style="color:#1a7a4a">Jun ext: ${fa(d.ju_ext)}</span>`:''}
+            ${d.jul_ord?`<span style="color:#1565c0">Jul ord: ${fa(d.jul_ord)}</span>`:''}
+            ${d.jul_ext?`<span style="color:#1a7a4a">Jul ext: ${fa(d.jul_ext)}</span>`:''}
           </div>
         </div>
         <div style="text-align:right;margin-left:8px">
@@ -1616,9 +1623,9 @@ function renderDeu(){
   }).join('');
 
   // Totales generales con deuda efectiva
-  const totOrdGen = DEU_EF.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0),0);
-  const totExtGen = DEU_EF.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0),0);
-  const cntDeu = DEU_EF.filter(d=>(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)>0).length;
+  const totOrdGen = DEU_EF.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0),0);
+  const totExtGen = DEU_EF.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0),0);
+  const cntDeu = DEU_EF.filter(d=>(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)>0).length;
   document.getElementById('deu-cnt').textContent = cntDeu;
   document.getElementById('deu-tot-ord').textContent = fa(totOrdGen);
   document.getElementById('deu-tot-ext').textContent = fa(totExtGen);
@@ -1690,7 +1697,7 @@ function mesesDeuda(d){
   if((d.or||0)||(d.xr||0)) count++;
   if((d.oa||0)||(d.xa||0)) count++;
   if((d.oy||0)||(d.xy||0)) count++;
-  if((d.ju_ord||0)||(d.ju_ext||0)) count++;
+  if((d.ju_ord||0)||(d.ju_ext||0)||(d.jul_ord||0)||(d.jul_ext||0)) count++;
   return count;
 }
 
@@ -1698,11 +1705,11 @@ function renderAlertas(DEU_EF){
   // Usar deuda efectiva (ya descontados los cobros del mes)
   const src = DEU_EF || DEU;
   const criticos = src.filter(d=>{
-    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0);
     return totGen>0 && mesesDeuda(d) >= 3;
   });
   const atencion = src.filter(d=>{
-    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0);
     return totGen>0 && mesesDeuda(d) === 2;
   });
 
@@ -1712,8 +1719,8 @@ function renderAlertas(DEU_EF){
     html += `<div style="background:#fdecea;border-radius:8px;padding:10px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:8px">🔴 Aviso firme — 3 o más meses de deuda (${criticos.length} lotes)</div>`;
     criticos.forEach(d=>{
-      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
-      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0);
+      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0);
       const totGen=totOrd+totExt;
       const ms=mesesDeuda(d);
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #f5c6cb">
@@ -1731,8 +1738,8 @@ function renderAlertas(DEU_EF){
     html += `<div style="background:#fff8e1;border-radius:8px;padding:10px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:8px">🟠 Recordatorio — 2 meses de deuda (${atencion.length} lotes)</div>`;
     atencion.forEach(d=>{
-      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0);
-      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0);
+      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0);
+      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0);
       const totGen=totOrd+totExt;
       const ms=mesesDeuda(d);
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #ffe0b2">
@@ -1763,6 +1770,7 @@ const MI=[
   {mes:'Abr 2026',venc:new Date('2026-04-15'),co:'oa',cx:'xa'},
   {mes:'May 2026',venc:new Date('2026-05-15'),co:'oy',cx:'xy'},
   {mes:'Jun 2026',venc:new Date('2026-06-15'),co:'ju_ord',cx:'ju_ext'},
+  {mes:'Jul 2026',venc:new Date('2026-07-15'),co:'jul_ord',cx:'jul_ext'},
 ];
 
 function calcD(d,fc){
@@ -2342,7 +2350,7 @@ window.verRecibo=()=>{
 function poblarIntLote(){
   const s=document.getElementById('int-lote');
   DEU.forEach(d=>{
-    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ord||0)+(d.ju_ext||0);
+    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ord||0)+(d.ju_ext||0)+(d.jul_ord||0)+(d.jul_ext||0);
     if(!tot) return;
     const o=document.createElement('option'); o.value=d.l+'|'+d.p; o.textContent=d.l+' — '+d.p; s.appendChild(o);
   });
