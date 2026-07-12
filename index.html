@@ -143,6 +143,9 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <button onclick="cerrarSesion()" style="font-size:10px;padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer">Salir</button>
   </div>
 </div>
+<div id="banner-prueba" style="display:none;background:#B24B3C;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:6px;letter-spacing:.3px">
+  🧪 MODO PRUEBA — lo que registres acá NO afecta la deuda ni la rendición real
+</div>
 
 <div class="tabs">
   <button class="tab on" onclick="ST('cob',this)">💰 Cobros del mes</button>
@@ -768,7 +771,16 @@ window.cambiarMes = val => {
 };
 
 // FIREBASE LISTENERS
-function colC(){ return 'C_' + MES.replace('-',''); }
+// 🧪 MODO_PRUEBA: esta branch es para que Juan y Walter prueben el circuito con un
+// lote real (lectura normal), pero todo lo que se REGISTRA (cobro, recibo, numeración)
+// se guarda en colecciones separadas con prefijo PRUEBA_, para no tocar la deuda ni
+// la rendición real. Para pasar esto a producción de verdad, hay que sacar este flag.
+const MODO_PRUEBA = true;
+if(MODO_PRUEBA){
+  const _b = document.getElementById('banner-prueba');
+  if(_b) _b.style.display = 'block';
+}
+function colC(){ return (MODO_PRUEBA?'PRUEBA_':'') + 'C_' + MES.replace('-',''); }
 function colE(){ return 'E_' + MES.replace('-',''); }
 
 // Cargar cobros de todos los meses para calcDeudaEfectiva
@@ -1975,7 +1987,7 @@ function _codigoAleatorio(n){
 // digital en el mismo instante (caso muy poco probable) — para uso normal,
 // con el contador ya creado, sí queda protegido con transacción.
 async function obtenerProximoReciboDigital(){
-  const contadorRef = doc(db, '_contadores', 'recibos');
+  const contadorRef = doc(db, '_contadores', MODO_PRUEBA ? 'recibos_prueba' : 'recibos');
   const snap = await getDoc(contadorRef);
   if(!snap.exists()){
     const seed = prompt('Primera vez que se genera un recibo digital.\n\n¿Cuál es el ÚLTIMO número de recibo ya entregado en el talonario físico? (confirmá con Juan o Walter antes de poner un número)\n\nEl próximo recibo digital será ese número + 1.');
@@ -2175,10 +2187,10 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) =>
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
       conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
-      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'',
+      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA,
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString()
     };
-    await addDoc(collection(db,'RECIBOS'), reciboDoc);
+    await addDoc(collection(db, MODO_PRUEBA?'PRUEBA_RECIBOS':'RECIBOS'), reciboDoc);
 
     const meta = {recibo:numero, codigo, urlVerificacion, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
     const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
@@ -2212,7 +2224,7 @@ async function mostrarVerificacionPublica(codigo){
   document.getElementById('verificar-screen').style.display='block';
   const body = document.getElementById('verificar-body');
   try{
-    const q = query(collection(db,'RECIBOS'), where('codigo','==',codigo));
+    const q = query(collection(db, MODO_PRUEBA?'PRUEBA_RECIBOS':'RECIBOS'), where('codigo','==',codigo));
     const snap = await getDocs(q);
     if(snap.empty){
       body.innerHTML = `<div style="text-align:center;padding:20px 0">
