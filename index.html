@@ -459,6 +459,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const app = initializeApp({
   apiKey:"AIzaSyCAHUPFjGYTh-r0zzjLcf1F4wunJ8C5RJI",
@@ -469,16 +470,17 @@ const app = initializeApp({
   appId:"1:1091982866796:web:60f162ce554518c2aedb49"
 });
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const fa = n => '$' + Math.round(n).toLocaleString('es-AR');
 
-// ── USUARIOS ──
+// ── USUARIOS ── (mapa de usuario -> email Firebase Auth + datos de UI; el control real de permisos está en las reglas de Firestore, no acá)
 const USUARIOS = {
-  'jponce':   {pass:'LasP2026jp', nombre:'Juan Luis Ponce', rol:'admin'},
-  'wvallejo': {pass:'LasP2026wv', nombre:'Walter Vallejo',  rol:'admin'},
-  'jvarvaro': {pass:'LasP2026jv', nombre:'Juana Varvaro',   rol:'admin'},
-  'spuertas': {pass:'LasP2026sp', nombre:'S. Puertas',      rol:'admin'},
-  'consulta': {pass:'LasP2026',   nombre:'Consulta',        rol:'consulta'},
+  'jponce':   {email:'jponce@laspalmas-admin.com',   nombre:'Juan Luis Ponce', rol:'admin'},
+  'wvallejo': {email:'wvallejo@laspalmas-admin.com', nombre:'Walter Vallejo',  rol:'admin'},
+  'jvarvaro': {email:'jvarvaro@laspalmas-admin.com', nombre:'Juana Varvaro',   rol:'admin'},
+  'spuertas': {email:'spuertas@laspalmas-admin.com', nombre:'S. Puertas',      rol:'admin'},
+  'consulta': {email:'consulta@laspalmas-admin.com', nombre:'Consulta',        rol:'consulta'},
 };
 let USER_ACTUAL = null;
 
@@ -497,12 +499,29 @@ window.doLogin = () => {
   const u = document.getElementById('l-user').value.trim().toLowerCase();
   const p = document.getElementById('l-pass').value;
   const errEl = document.getElementById('login-err');
-  if(USUARIOS[u] && USUARIOS[u].pass === p){
-    USER_ACTUAL = {id:u, nombre:USUARIOS[u].nombre, rol:USUARIOS[u].rol};
+  const meta = USUARIOS[u];
+  if(!meta){ errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  signInWithEmailAndPassword(auth, meta.email, p)
+    .catch(() => { errEl.style.display='block'; });
+  // El resto (mostrar pantalla, aplicar modo consulta, etc.) lo maneja onAuthStateChanged
+};
+
+window.cerrarSesion = () => {
+  if(!confirm('¿Cerrar sesión?')) return;
+  registrarActividad('Salió del sistema');
+  signOut(auth).then(()=>location.reload());
+};
+
+// Firebase mantiene la sesión sola (persistencia local) — acá reaccionamos a login/logout reales
+onAuthStateChanged(auth, (fbUser) => {
+  if(fbUser){
+    const u = (fbUser.email||'').split('@')[0].toLowerCase();
+    const meta = USUARIOS[u];
+    if(!meta) return; // usuario autenticado pero no reconocido en la app
+    USER_ACTUAL = {id:u, nombre:meta.nombre, rol:meta.rol};
     document.getElementById('login-screen').style.display='none';
     document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
-    sessionStorage.setItem('lp_user', JSON.stringify(USER_ACTUAL));
-    errEl.style.display='none';
     if(USER_ACTUAL.rol==='consulta'){
       setTimeout(aplicarModoConsulta, 500);
     } else {
@@ -510,25 +529,10 @@ window.doLogin = () => {
       listenActividad();
     }
   } else {
-    errEl.style.display='block';
+    USER_ACTUAL = null;
+    document.getElementById('login-screen').style.display='flex';
   }
-};
-
-window.cerrarSesion = () => {
-  if(!confirm('¿Cerrar sesión?')) return;
-  registrarActividad('Salió del sistema');
-  sessionStorage.removeItem('lp_user');
-  location.reload();
-};
-
-// Restaurar sesión si estaba logueado
-const _sess = sessionStorage.getItem('lp_user');
-if(_sess){
-  USER_ACTUAL = JSON.parse(_sess);
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
-  if(USER_ACTUAL.rol==='consulta') setTimeout(aplicarModoConsulta, 500);
-}
+});
 
 // Presionar Enter en login
 document.getElementById('l-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window.doLogin(); });
