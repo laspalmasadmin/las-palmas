@@ -216,7 +216,15 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <input type="number" id="im" inputmode="numeric" readonly value="0" style="background:#f0f2f5;font-weight:700;color:#1a7a4a">
     </div>
     <div class="fg"><label>Forma</label><select id="sf" onchange="toggleLemon(this.value)"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
-    <div class="fg" id="fg-lemon" style="display:none"><label>N° transacción Lemon</label><input type="text" id="ilemon" placeholder="últimos dígitos ej: 3401b"></div>
+    <div class="fg" id="fg-lemon" style="display:none">
+      <label>N° transacción / operación</label><input type="text" id="ilemon" placeholder="ej: 168224031768">
+      <label style="margin-top:8px">Foto del comprobante (opcional)</label>
+      <input type="file" id="icomprobante" accept="image/*" capture="environment" onchange="leerComprobante(this)">
+      <div id="comprobante-preview" style="display:none;margin-top:6px">
+        <img id="comprobante-img" style="max-width:120px;border-radius:6px;border:1px solid #ddd;display:block">
+        <button type="button" class="btn-sm" style="margin-top:4px;background:#fff;border-color:#c62828;color:#c62828" onclick="quitarComprobante()">✕ Quitar foto</button>
+      </div>
+    </div>
     <div class="fg"><label>N° Recibo</label><input type="text" id="ir" placeholder="355"></div>
     <div class="fg"><label>Fecha</label><input type="text" id="id" placeholder="05/06/2026"></div>
     <div class="fg"><label>Observación</label><input type="text" id="iob" placeholder="Cuota 3/12"></div>
@@ -884,6 +892,38 @@ window.toggleLemon = v => {
   document.getElementById('fg-lemon').style.display = v==='Transferencia'?'block':'none';
 };
 
+// Guarda la foto del comprobante como dataURL comprimido (JPEG, máx 500px lado
+// mayor, calidad 0.45) para poder adjuntarla al cobro y al recibo sin pasarnos
+// del límite de tamaño de un documento de Firestore (1MB).
+window._comprobanteDataURL = '';
+window.leerComprobante = (input) => {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 500;
+      let w = img.width, h = img.height;
+      if(w > h && w > max){ h = Math.round(h*max/w); w = max; }
+      else if(h > max){ w = Math.round(w*max/h); h = max; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      window._comprobanteDataURL = canvas.toDataURL('image/jpeg', 0.45);
+      document.getElementById('comprobante-img').src = window._comprobanteDataURL;
+      document.getElementById('comprobante-preview').style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+window.quitarComprobante = () => {
+  window._comprobanteDataURL = '';
+  document.getElementById('icomprobante').value = '';
+  document.getElementById('comprobante-preview').style.display = 'none';
+};
+
 window.registrar = async () => {
   const btn=document.getElementById('btn-reg');
   btn.disabled=true; btn.textContent='Guardando...';
@@ -917,6 +957,7 @@ window.registrar = async () => {
       recibo: document.getElementById('ir').value||'—',
       fecha: document.getElementById('id').value||'',
       lemon: document.getElementById('ilemon').value.trim()||'',
+      comprobanteImg: window._comprobanteDataURL||'',
       obs: document.getElementById('iob').value||''
     };
     await addDoc(collection(db, colC()), cobro);
@@ -930,6 +971,7 @@ window.registrar = async () => {
       await window.generarReciboDigital(cobro, loteInfo, capitalPer, interesPer);
     }
     ['iob','ilemon'].forEach(id=>document.getElementById(id).value='');
+    window.quitarComprobante();
     document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
     document.getElementById('ir').value='';
     document.getElementById('interes-periodos').innerHTML='';
@@ -2042,6 +2084,14 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.text('Forma de pago', 10, y);
   docPDF.text(cobro.forma||'', W-10, y, {align:'right'});
 
+  if(cobro.forma==='Transferencia' && cobro.lemon){
+    y += 5;
+    docPDF.setFontSize(7); docPDF.setTextColor(120,120,120);
+    docPDF.text('N° de operación', 10, y);
+    docPDF.setTextColor(60,60,60);
+    docPDF.text(cobro.lemon, W-10, y, {align:'right'});
+  }
+
   y += 8;
   docPDF.setFillColor(...crema);
   docPDF.roundedRect(10, y, W-20, 14, 2, 2, 'F');
@@ -2121,6 +2171,7 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) =>
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
       conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
+      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'',
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString()
     };
     await addDoc(collection(db,'RECIBOS'), reciboDoc);
@@ -2175,6 +2226,8 @@ async function mostrarVerificacionPublica(codigo){
       </div>
       <div style="font-size:13px;margin-bottom:4px"><b>${r.lote}</b> — ${r.propietario}</div>
       <div style="font-size:11px;color:#888;margin-bottom:8px">Fecha: ${r.fecha||'—'} · Forma: ${r.forma||'—'}</div>
+      ${r.forma==='Transferencia' && r.lemon ? `<div style="font-size:11px;color:#555;margin-bottom:8px;background:#f5f5f5;border-radius:6px;padding:6px 8px">N° de operación: <b>${r.lemon}</b><br><span style="font-size:9px;color:#999">Cotejá este número contra tu propio resumen de Mercado Pago/Lemon/banco.</span></div>` : ''}
+      ${r.comprobanteImg ? `<div style="margin-bottom:8px;text-align:center"><img src="${r.comprobanteImg}" style="max-width:100%;border-radius:6px;border:1px solid #eee"><div style="font-size:9px;color:#999;margin-top:2px">Comprobante adjuntado por la administración</div></div>` : ''}
       <div style="border-top:1px solid #eee;padding-top:8px">
         ${(r.conceptos||[]).map(c=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
           <span>${c.label}</span><span style="font-weight:700">$${Math.round(c.subtotal).toLocaleString('es-AR')}</span>
