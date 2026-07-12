@@ -118,6 +118,18 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 </div>
 
+<!-- VERIFICACION PUBLICA DE RECIBO (sin login) -->
+<div id="verificar-screen" style="display:none;position:fixed;top:0;left:0;width:100%;min-height:100%;background:#f0f2f5;z-index:2000;padding:24px 16px;box-sizing:border-box">
+  <div class="card" style="max-width:420px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-size:32px">🏘</div>
+      <div style="font-weight:700;color:#1a7a4a">Barrio Las Palmas</div>
+      <div style="font-size:11px;color:#888">Verificación de recibo</div>
+    </div>
+    <div id="verificar-body"><div class="empty">Buscando recibo...</div></div>
+  </div>
+</div>
+
 <div class="hdr">
   <div><h1>🏘 Barrio Las Palmas</h1><p id="hdr-p">Cobranzas Mayo 2026</p></div>
   <div class="hdr-r">
@@ -208,7 +220,15 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg"><label>N° Recibo</label><input type="text" id="ir" placeholder="355"></div>
     <div class="fg"><label>Fecha</label><input type="text" id="id" placeholder="05/06/2026"></div>
     <div class="fg"><label>Observación</label><input type="text" id="iob" placeholder="Cuota 3/12"></div>
+    <div class="fg" style="background:#f0f7f4;border:1px solid #cfe8dc;border-radius:8px;padding:8px 10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
+        <input type="checkbox" id="chk-recibo-digital" style="width:16px;height:16px">
+        <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR + WhatsApp)</span>
+      </label>
+      <button type="button" class="btn-sm" style="width:100%;margin-top:8px;background:#fff;border-color:#1a7a4a;color:#1a7a4a" onclick="previsualizarReciboEjemplo()">👁️ Ver ejemplo de recibo (no guarda nada)</button>
+    </div>
     <button class="btn" id="btn-reg" onclick="registrar()">✓ Registrar cobro</button>
+    <div id="recibo-digital-out"></div>
   </div>
 
   <input class="srch" type="search" placeholder="🔍 Buscar lote o propietario..." oninput="filtrarL(this.value)">
@@ -426,10 +446,11 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey:"AIzaSyCAHUPFjGYTh-r0zzjLcf1F4wunJ8C5RJI",
@@ -440,17 +461,16 @@ const app = initializeApp({
   appId:"1:1091982866796:web:60f162ce554518c2aedb49"
 });
 const db = getFirestore(app);
-const auth = getAuth(app);
 
 const fa = n => '$' + Math.round(n).toLocaleString('es-AR');
 
-// ── USUARIOS ── (mapa de usuario -> email Firebase Auth + datos de UI; el control real de permisos está en las reglas de Firestore, no acá)
+// ── USUARIOS ──
 const USUARIOS = {
-  'jponce':   {email:'jponce@laspalmas-admin.com',   nombre:'Juan Luis Ponce', rol:'admin'},
-  'wvallejo': {email:'wvallejo@laspalmas-admin.com', nombre:'Walter Vallejo',  rol:'admin'},
-  'jvarvaro': {email:'jvarvaro@laspalmas-admin.com', nombre:'Juana Varvaro',   rol:'admin'},
-  'spuertas': {email:'spuertas@laspalmas-admin.com', nombre:'S. Puertas',      rol:'admin'},
-  'consulta': {email:'consulta@laspalmas-admin.com', nombre:'Consulta',        rol:'consulta'},
+  'jponce':   {pass:'LasP2026jp', nombre:'Juan Luis Ponce', rol:'admin'},
+  'wvallejo': {pass:'LasP2026wv', nombre:'Walter Vallejo',  rol:'admin'},
+  'jvarvaro': {pass:'LasP2026jv', nombre:'Juana Varvaro',   rol:'admin'},
+  'spuertas': {pass:'LasP2026sp', nombre:'S. Puertas',      rol:'admin'},
+  'consulta': {pass:'LasP2026',   nombre:'Consulta',        rol:'consulta'},
 };
 let USER_ACTUAL = null;
 
@@ -469,29 +489,12 @@ window.doLogin = () => {
   const u = document.getElementById('l-user').value.trim().toLowerCase();
   const p = document.getElementById('l-pass').value;
   const errEl = document.getElementById('login-err');
-  const meta = USUARIOS[u];
-  if(!meta){ errEl.style.display='block'; return; }
-  errEl.style.display='none';
-  signInWithEmailAndPassword(auth, meta.email, p)
-    .catch(() => { errEl.style.display='block'; });
-  // El resto (mostrar pantalla, aplicar modo consulta, etc.) lo maneja onAuthStateChanged
-};
-
-window.cerrarSesion = () => {
-  if(!confirm('¿Cerrar sesión?')) return;
-  registrarActividad('Salió del sistema');
-  signOut(auth).then(()=>location.reload());
-};
-
-// Firebase mantiene la sesión sola (persistencia local) — acá reaccionamos a login/logout reales
-onAuthStateChanged(auth, (fbUser) => {
-  if(fbUser){
-    const u = (fbUser.email||'').split('@')[0].toLowerCase();
-    const meta = USUARIOS[u];
-    if(!meta) return; // usuario autenticado pero no reconocido en la app
-    USER_ACTUAL = {id:u, nombre:meta.nombre, rol:meta.rol};
+  if(USUARIOS[u] && USUARIOS[u].pass === p){
+    USER_ACTUAL = {id:u, nombre:USUARIOS[u].nombre, rol:USUARIOS[u].rol};
     document.getElementById('login-screen').style.display='none';
     document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
+    sessionStorage.setItem('lp_user', JSON.stringify(USER_ACTUAL));
+    errEl.style.display='none';
     if(USER_ACTUAL.rol==='consulta'){
       setTimeout(aplicarModoConsulta, 500);
     } else {
@@ -499,10 +502,25 @@ onAuthStateChanged(auth, (fbUser) => {
       listenActividad();
     }
   } else {
-    USER_ACTUAL = null;
-    document.getElementById('login-screen').style.display='flex';
+    errEl.style.display='block';
   }
-});
+};
+
+window.cerrarSesion = () => {
+  if(!confirm('¿Cerrar sesión?')) return;
+  registrarActividad('Salió del sistema');
+  sessionStorage.removeItem('lp_user');
+  location.reload();
+};
+
+// Restaurar sesión si estaba logueado
+const _sess = sessionStorage.getItem('lp_user');
+if(_sess){
+  USER_ACTUAL = JSON.parse(_sess);
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('hdr-user').textContent = '👤 '+USER_ACTUAL.nombre;
+  if(USER_ACTUAL.rol==='consulta') setTimeout(aplicarModoConsulta, 500);
+}
 
 // Presionar Enter en login
 document.getElementById('l-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window.doLogin(); });
@@ -908,6 +926,9 @@ window.registrar = async () => {
     const detInt = Object.entries(interesPer).map(([k,v])=>`${PERIOD_LABELS[k]||k} ${fa(v)}`).join(', ');
     toast(`✅ Cobro registrado · ${loteInfo?loteInfo.l:''}`);
     registrarActividad(`Registró cobro: ${loteInfo?loteInfo.l+' - '+loteInfo.p:''} · ${fa(monto)}${interes?` (Cap ${fa(capitalTot)} + Int ${fa(interes)}: ${detInt})`:''} · ${cobro.conc} · ${per}`);
+    if(document.getElementById('chk-recibo-digital').checked){
+      await window.generarReciboDigital(cobro, loteInfo, capitalPer, interesPer);
+    }
     ['iob','ilemon'].forEach(id=>document.getElementById(id).value='');
     document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
     document.getElementById('ir').value='';
@@ -1786,8 +1807,31 @@ window.calcLote=()=>{
   const totExt=capExt+intExt;
   const totGen=totOrd+totExt;
 
-  // Guardar datos para imprimir
-  window._ultimoLote={...d, lote,prop,fc,filas,capOrd,intOrd,capExt,intExt,totOrd,totExt,totGen};
+  // Desglose por período (para prellenar "Generar cobro" con los mismos valores
+  // que se liquidaron acá, sin tener que retipear nada)
+  const periodosBreak=[];
+  MI.forEach(m=>{
+    if(fc<m.venc) return;
+    const cO=d[m.co]||0, cX=d[m.cx]||0;
+    if(cO){
+      const dias=Math.floor((fc-m.venc)/86400000);
+      const fcDate=new Date(fc), vencDate=new Date(m.venc);
+      const esMesCurso=fcDate.getFullYear()===vencDate.getFullYear()&&fcDate.getMonth()===vencDate.getMonth();
+      const iO=esMesCurso?Math.round(cO*0.04):Math.round(cO*(0.04/30)*dias);
+      periodosBreak.push({campo:m.co, tipo:'ordinaria', cap:cO, int:iO});
+    }
+    if(cX){
+      const dias=Math.floor((fc-m.venc)/86400000);
+      const fcDate=new Date(fc), vencDate=new Date(m.venc);
+      const esMesCurso=fcDate.getFullYear()===vencDate.getFullYear()&&fcDate.getMonth()===vencDate.getMonth();
+      const iX=esMesCurso?Math.round(cX*0.04):Math.round(cX*(0.04/30)*dias);
+      periodosBreak.push({campo:m.cx, tipo:'extraordinaria', cap:cX, int:iX});
+    }
+  });
+  const loteN = (LB.find(x=>x.l===lote)||{}).n;
+
+  // Guardar datos para imprimir / generar cobro
+  window._ultimoLote={...d, lote,prop,fc,filas,capOrd,intOrd,capExt,intExt,totOrd,totExt,totGen,periodosBreak,loteN};
 
   document.getElementById('int-res').innerHTML=`
     <div class="lc pag" style="margin-top:8px">
@@ -1813,7 +1857,367 @@ window.calcLote=()=>{
       </div>
       <div style="font-size:9px;color:#aaa;text-align:center;margin-top:8px">Tasa: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes</div>
       <button onclick="imprimirLote()" style="width:100%;margin-top:10px;padding:10px;background:#1565c0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir liquidación</button>
+      ${capOrd?`<button onclick="generarCobroDesdeLiquidacion('ordinaria')" style="width:100%;margin-top:8px;padding:10px;background:#fff;color:#1565c0;border:2px solid #1565c0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">➡️ Generar cobro — Exp. Ordinaria (${fa(totOrd)})</button>`:''}
+      ${capExt?`<button onclick="generarCobroDesdeLiquidacion('extraordinaria')" style="width:100%;margin-top:8px;padding:10px;background:#fff;color:#1a7a4a;border:2px solid #1a7a4a;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">➡️ Generar cobro — Exp. Extraordinaria (${fa(totExt)})</button>`:''}
     </div>`;
+};
+
+// Trae el desglose de la liquidación de deuda (📐 Calcular intereses) directo al
+// formulario de "Registrar cobro", ya con los períodos tildados y el capital/interés
+// precargado. Todo queda editable: si el propietario paga menos que lo liquidado,
+// se ajustan los montos de cada período antes de confirmar "Registrar cobro".
+window.generarCobroDesdeLiquidacion = (tipo) => {
+  const d = window._ultimoLote;
+  if(!d || !d.periodosBreak){ toast('⚠️ Primero calculá la liquidación del lote'); return; }
+  if(!d.loteN){ toast('⚠️ No se encontró el lote'); return; }
+
+  // Cambiar a la solapa "Cobros del mes"
+  const tabBtn = document.querySelector(`.tab[onclick*="ST('cob'"]`);
+  if(tabBtn) window.ST('cob', tabBtn);
+
+  // Setear lote y concepto
+  document.getElementById('sl').value = d.loteN;
+  document.getElementById('sc').value = tipo;
+
+  // Tildar solo los períodos de este concepto que tengan capital pendiente
+  const periodosTipo = d.periodosBreak.filter(p=>p.tipo===tipo);
+  document.querySelectorAll('input[name="sper"]').forEach(cb=>{ cb.checked = periodosTipo.some(p=>p.campo===cb.value); });
+
+  // Precarga capital (sugerido por deuda real) + fecha, luego pisamos el interés
+  // con el mismo valor ya calculado en la liquidación para que coincida exacto.
+  window.renderInteresPeriodos();
+  const fc = d.fc;
+  if(fc && !isNaN(fc)){
+    const dd = String(fc.getDate()).padStart(2,'0');
+    const mm = String(fc.getMonth()+1).padStart(2,'0');
+    document.getElementById('id').value = `${dd}/${mm}/${fc.getFullYear()}`;
+  }
+  periodosTipo.forEach(p=>{
+    const capEl = document.getElementById('cap-per-'+p.campo);
+    const intEl = document.getElementById('int-per-'+p.campo);
+    if(capEl) capEl.value = p.cap;
+    if(intEl) intEl.value = p.int;
+  });
+  window.actualizarTotalesInteres();
+
+  // Precargar N° de recibo sugerido (correlativo), pero queda editable
+  const nums = COBROS.map(c=>parseInt(c.recibo)).filter(n=>!isNaN(n));
+  const next = nums.length ? Math.max(...nums)+1 : 376;
+  const irEl = document.getElementById('ir');
+  if(irEl && !irEl.value) irEl.value = next;
+
+  toast(`📐 Liquidación cargada — revisá los montos antes de confirmar`);
+  document.getElementById('sl').scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+// ══════════════ RECIBO DIGITAL (PDF + QR + WhatsApp) ══════════════
+// Todo esto es ADITIVO: si el checkbox "Generar recibo digital" no está
+// tildado, el flujo de registrar() sigue funcionando exactamente igual que
+// siempre. Nada de esto toca C_202605 ni C_202606 (meses cerrados) — solo
+// lee/escribe la colección nueva "RECIBOS" y el contador "_contadores/recibos".
+
+function _codigoAleatorio(n){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s=''; for(let i=0;i<n;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+// Numeración correlativa de recibos digitales. La primera vez que se usa,
+// pregunta cuál es el último número ya entregado en el talonario físico
+// (pendiente de confirmar con Juan/Walter) para no pisar esa numeración.
+// NOTA: no es 100% atómico frente a dos usuarios generando el PRIMER recibo
+// digital en el mismo instante (caso muy poco probable) — para uso normal,
+// con el contador ya creado, sí queda protegido con transacción.
+async function obtenerProximoReciboDigital(){
+  const contadorRef = doc(db, '_contadores', 'recibos');
+  const snap = await getDoc(contadorRef);
+  if(!snap.exists()){
+    const seed = prompt('Primera vez que se genera un recibo digital.\n\n¿Cuál es el ÚLTIMO número de recibo ya entregado en el talonario físico? (confirmá con Juan o Walter antes de poner un número)\n\nEl próximo recibo digital será ese número + 1.');
+    const seedNum = parseInt(seed);
+    await setDoc(contadorRef, {ultimo: isNaN(seedNum) ? 375 : seedNum});
+  }
+  return await runTransaction(db, async tx=>{
+    const s = await tx.get(contadorRef);
+    const ultimo = (s.data()&&s.data().ultimo) || 0;
+    const proximo = ultimo+1;
+    tx.set(contadorRef, {ultimo: proximo});
+    return proximo;
+  });
+}
+
+// Arma el array de conceptos (período + capital + interés) a partir de lo que
+// se tipeó/editó en el formulario — capital e interés siempre por separado,
+// tal cual salió de la liquidación (o editado a mano si pagó menos).
+function _conceptosDesdeForm(cobro, capitalPer, interesPer){
+  const claves = [...new Set([...Object.keys(capitalPer), ...Object.keys(interesPer)])];
+  const tipoLabel = tipoL(cobro.conc);
+  if(!claves.length){
+    return [{label:tipoLabel, cap:0, int:0, subtotal:0}];
+  }
+  return claves.map(k=>{
+    const cap = capitalPer[k]||0, int = interesPer[k]||0;
+    return {label:`${PERIOD_LABELS[k]||k} · ${tipoLabel}`, cap, int, subtotal:cap+int};
+  });
+}
+
+// Genera el QR como imagen (dataURL) usando qrcode.min.js. Si por algún motivo
+// no se puede generar (librería no cargó, etc.), devuelve null — el recibo
+// igual funciona, solo queda sin el QR (el código de verificación se ve igual).
+function _qrDataURL(texto){
+  try{
+    const tmp = document.createElement('div');
+    tmp.style.display='none';
+    document.body.appendChild(tmp);
+    new QRCode(tmp, {text:texto, width:160, height:160, correctLevel:QRCode.CorrectLevel.M});
+    const canvas = tmp.querySelector('canvas');
+    const url = canvas ? canvas.toDataURL('image/png') : null;
+    document.body.removeChild(tmp);
+    return url;
+  }catch(e){ console.error('QR error', e); return null; }
+}
+
+// Construye el PDF del recibo con jsPDF, con el mismo estilo verde/dorado que
+// la rendición formal. Devuelve el objeto jsPDF (doc.output('blob') para compartir).
+function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
+  const { jsPDF } = window.jspdf;
+  const docPDF = new jsPDF({unit:'mm', format:'a5'});
+  const W = docPDF.internal.pageSize.getWidth();
+  const verde=[31,77,61], dorado=[169,133,63], crema=[250,246,238];
+
+  docPDF.setFillColor(...verde);
+  docPDF.rect(0,0,W,26,'F');
+  docPDF.setTextColor(255,255,255);
+  docPDF.setFontSize(11);
+  docPDF.text('Consorcio de Propietarios', W/2, 9, {align:'center'});
+  docPDF.setTextColor(...dorado);
+  docPDF.setFontSize(13);
+  docPDF.text('Barrio Las Palmas', W/2, 15.5, {align:'center'});
+  docPDF.setTextColor(220,235,228);
+  docPDF.setFontSize(8);
+  docPDF.text('William Cross 3302, Las Talitas, Tucumán', W/2, 21, {align:'center'});
+
+  let y = 34;
+  docPDF.setTextColor(30,30,30);
+  docPDF.setFontSize(9);
+  docPDF.text('Recibo', 10, y);
+  docPDF.setFontSize(14);
+  docPDF.setTextColor(...verde);
+  docPDF.text(`N.º ${String(meta.recibo).padStart(4,'0')}`, 10, y+6);
+  docPDF.setFontSize(9);
+  docPDF.setTextColor(30,30,30);
+  docPDF.text('Fecha', W-10, y, {align:'right'});
+  docPDF.setFontSize(11);
+  docPDF.text(cobro.fecha||'', W-10, y+6, {align:'right'});
+
+  y += 14;
+  docPDF.setDrawColor(220,220,220);
+  docPDF.line(10, y, W-10, y);
+  y += 6;
+  docPDF.setFontSize(8); docPDF.setTextColor(140,140,140);
+  docPDF.text('Propietario', 10, y);
+  y += 5;
+  docPDF.setFontSize(11); docPDF.setTextColor(30,30,30);
+  docPDF.text(loteInfo?loteInfo.p:'', 10, y);
+  y += 5;
+  docPDF.setFontSize(9); docPDF.setTextColor(90,90,90);
+  docPDF.text(loteInfo?loteInfo.l:'', 10, y);
+
+  y += 8;
+  docPDF.setFontSize(8); docPDF.setTextColor(140,140,140);
+  docPDF.text('Conceptos', 10, y);
+  y += 4;
+  docPDF.setFontSize(8);
+  conceptos.forEach(c=>{
+    docPDF.setTextColor(60,60,60);
+    docPDF.text(c.label, 10, y);
+    docPDF.setTextColor(30,30,30);
+    docPDF.text(`$${Math.round(c.subtotal).toLocaleString('es-AR')}`, W-10, y, {align:'right'});
+    y += 5;
+    docPDF.setDrawColor(240,240,240);
+    docPDF.line(10, y-1.5, W-10, y-1.5);
+  });
+
+  y += 3;
+  docPDF.setFontSize(8); docPDF.setTextColor(90,90,90);
+  docPDF.text('Forma de pago', 10, y);
+  docPDF.text(cobro.forma||'', W-10, y, {align:'right'});
+
+  y += 8;
+  docPDF.setFillColor(...crema);
+  docPDF.roundedRect(10, y, W-20, 14, 2, 2, 'F');
+  docPDF.setFontSize(9); docPDF.setTextColor(107,91,58);
+  docPDF.text('Total cobrado', 14, y+9);
+  docPDF.setFontSize(13); docPDF.setTextColor(...verde);
+  docPDF.text(`$${Math.round(cobro.monto).toLocaleString('es-AR')}`, W-14, y+9.5, {align:'right'});
+
+  y += 20;
+  const qrImg = _qrDataURL(meta.urlVerificacion);
+  if(qrImg){ docPDF.addImage(qrImg, 'PNG', 10, y, 20, 20); }
+  docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
+  docPDF.text('Verificable en línea', 33, y+5);
+  docPDF.setFontSize(8); docPDF.setTextColor(30,30,30);
+  docPDF.text(meta.codigo, 33, y+9);
+  docPDF.setFontSize(6); docPDF.setTextColor(150,150,150);
+  docPDF.text('Este comprobante es una copia informativa. El registro', 33, y+13);
+  docPDF.text('oficial obra en los sistemas del Consorcio.', 33, y+16);
+
+  y += 26;
+  docPDF.setDrawColor(150,150,150);
+  docPDF.line(14, y, 60, y);
+  docPDF.setFontSize(8); docPDF.setTextColor(30,30,30);
+  docPDF.text(meta.firmante||'Juan Ponce / Walter Vallejo', 14, y+4);
+  docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
+  docPDF.text('Administrador', 14, y+8);
+
+  return docPDF;
+}
+
+// Imprime un PDF (jsPDF doc) directo, sin pasar por WhatsApp ni por el visor
+// del navegador — igual de práctico que el botón "🖨️ Imprimir" que ya usa
+// el resto de la app (ej. imprimirLote()).
+function imprimirPDF(pdfDoc){
+  const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
+  const ifr = document.createElement('iframe');
+  ifr.style.display='none';
+  ifr.src = blobUrl;
+  document.body.appendChild(ifr);
+  ifr.onload = () => {
+    setTimeout(()=>{
+      ifr.contentWindow.focus();
+      ifr.contentWindow.print();
+    }, 300);
+  };
+}
+
+// Comparte el PDF por WhatsApp usando el selector nativo del teléfono
+// (Web Share API con archivo). Si el navegador no lo soporta (ej. desktop
+// sin esa API), baja el PDF y abre WhatsApp Web con un texto para adjuntarlo a mano.
+async function compartirReciboWhatsapp(pdfDoc, filename, resumenTexto){
+  const blob = pdfDoc.output('blob');
+  const file = new File([blob], filename, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:resumenTexto});
+      return;
+    }catch(e){ /* usuario canceló o falló: cae al fallback */ }
+  }
+  pdfDoc.save(filename);
+  const wa = 'https://wa.me/?text=' + encodeURIComponent(resumenTexto + '\n(Adjuntá el PDF que se acaba de descargar)');
+  window.open(wa, '_blank');
+}
+
+// Punto de entrada: crea el doc en RECIBOS, arma el PDF, y muestra la vista
+// previa con el botón de compartir — se llama automáticamente desde registrar()
+// solo si el checkbox "Generar recibo digital" está tildado.
+window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) => {
+  try{
+    const out = document.getElementById('recibo-digital-out');
+    out.innerHTML = `<div class="empty">Generando recibo...</div>`;
+    const conceptos = _conceptosDesdeForm(cobro, capitalPer, interesPer);
+    let numero = parseInt(cobro.recibo);
+    if(isNaN(numero)) numero = await obtenerProximoReciboDigital();
+    const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
+    const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
+    const reciboDoc = {
+      recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
+      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
+      urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString()
+    };
+    await addDoc(collection(db,'RECIBOS'), reciboDoc);
+
+    const meta = {recibo:numero, codigo, urlVerificacion, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
+    const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
+    const filename = `Recibo_${numero}_${(loteInfo?loteInfo.p:'').replace(/\s+/g,'_')}.pdf`;
+    const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
+    const resumenTexto = `Recibo N.º ${numero} — ${loteInfo?loteInfo.l:''} — ${loteInfo?loteInfo.p:''} — Total: $${Math.round(cobro.monto).toLocaleString('es-AR')}`;
+
+    out.innerHTML = `
+      <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px;margin-top:8px">
+        <div style="font-size:12px;font-weight:700;color:#1a7a4a;margin-bottom:6px">🧾 Recibo N.º ${numero} generado</div>
+        <iframe src="${blobUrl}" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px"></iframe>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick='imprimirPDF(window._pdfPendiente_${numero})'>🖨️ Imprimir</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfPendiente_${numero}, "${filename}", ${JSON.stringify(resumenTexto)})'>📱 WhatsApp</button>
+        </div>
+      </div>`;
+    window['_pdfPendiente_'+numero] = pdfDoc;
+  }catch(e){
+    console.error(e);
+    toast('❌ Error generando recibo digital: '+e.message);
+  }
+};
+
+// ══════════════ VERIFICACIÓN PÚBLICA (sin login) ══════════════
+// Al abrir el link/QR del recibo (#verificar/CODIGO), muestra en solo lectura
+// lo que quedó guardado en Firestore al momento del cobro — así se puede
+// comparar contra el PDF que alguien esté mostrando, sin depender de su palabra.
+async function mostrarVerificacionPublica(codigo){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('verificar-screen').style.display='block';
+  const body = document.getElementById('verificar-body');
+  try{
+    const q = query(collection(db,'RECIBOS'), where('codigo','==',codigo));
+    const snap = await getDocs(q);
+    if(snap.empty){
+      body.innerHTML = `<div style="text-align:center;padding:20px 0">
+        <div style="font-size:32px">⚠️</div>
+        <div style="font-weight:700;color:#c62828;margin-top:8px">Código no encontrado</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">Este código no corresponde a ningún recibo registrado en el sistema.</div>
+      </div>`;
+      return;
+    }
+    const r = snap.docs[0].data();
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:11px;color:#888">Recibo</div>
+        <div style="font-size:20px;font-weight:700;color:#1a7a4a">N.º ${String(r.recibo).padStart(4,'0')}</div>
+      </div>
+      <div style="font-size:13px;margin-bottom:4px"><b>${r.lote}</b> — ${r.propietario}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px">Fecha: ${r.fecha||'—'} · Forma: ${r.forma||'—'}</div>
+      <div style="border-top:1px solid #eee;padding-top:8px">
+        ${(r.conceptos||[]).map(c=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
+          <span>${c.label}</span><span style="font-weight:700">$${Math.round(c.subtotal).toLocaleString('es-AR')}</span>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:2px solid #1a7a4a;font-weight:700">
+        <span>Total real registrado</span><span style="color:#1a7a4a">$${Math.round(r.total).toLocaleString('es-AR')}</span>
+      </div>
+      <div style="font-size:10px;color:#aaa;text-align:center;margin-top:12px">Este es el registro oficial del Consorcio para este recibo. Si el PDF que te mostraron no coincide con estos valores, avisá a la administración.</div>
+    `;
+  }catch(e){
+    body.innerHTML = `<div class="empty">Error al verificar: ${e.message}</div>`;
+  }
+}
+
+// Vista previa de EJEMPLO para mostrarle el diseño del recibo a Juan/Walter sin
+// generar nada real: no guarda en RECIBOS, no gasta un número de la numeración
+// correlativa, no toca ningún cobro. Usa datos ficticios fijos.
+window.previsualizarReciboEjemplo = () => {
+  const loteInfoEjemplo = {l:'Lote 39 Sur', p:'Zelaya Hugo (EJEMPLO)'};
+  const conceptosEjemplo = [
+    {label:'May 2026 · Exp. Extraordinaria', cap:3293, int:237, subtotal:3530},
+    {label:'Jun 2026 · Exp. Ordinaria', cap:90000, int:2760, subtotal:92760},
+    {label:'Jun 2026 · Exp. Extraordinaria', cap:95000, int:2913, subtotal:97913},
+  ];
+  const cobroEjemplo = {monto:194203, forma:'Transferencia', fecha:new Date().toLocaleDateString('es-AR')};
+  const meta = {recibo:'0000 (ejemplo)', codigo:'LP-EJEMPLO-DEMO', urlVerificacion: location.origin+location.pathname+'#verificar/EJEMPLO', firmante:'Juan Ponce / Walter Vallejo'};
+  const pdfDoc = construirPDFRecibo(meta, loteInfoEjemplo, conceptosEjemplo, cobroEjemplo);
+  const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
+  const resumenEjemplo = `Recibo de ejemplo — ${loteInfoEjemplo.l} — ${loteInfoEjemplo.p} — Total: $${cobroEjemplo.monto.toLocaleString('es-AR')}`;
+  window._pdfEjemplo = pdfDoc;
+  const out = document.getElementById('recibo-digital-out');
+  out.innerHTML = `
+    <div class="fg" style="border:1px dashed #a9853f;border-radius:8px;padding:10px;margin-top:8px;background:#fffdf7">
+      <div style="font-size:11px;font-weight:700;color:#a9853f;margin-bottom:6px">👁️ EJEMPLO — no se guardó nada, solo para mostrar el diseño</div>
+      <iframe src="${blobUrl}" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px"></iframe>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
+        <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick='imprimirPDF(window._pdfEjemplo)'>🖨️ Imprimir</button>
+        <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfEjemplo, "Recibo_EJEMPLO.pdf", ${JSON.stringify(resumenEjemplo)})'>📱 WhatsApp</button>
+      </div>
+    </div>`;
+  out.scrollIntoView({behavior:'smooth', block:'nearest'});
 };
 
 // ESTADO
@@ -2396,17 +2800,21 @@ window.imprimirLote=()=>{
 };
 
 // INIT
-poblarSL();
-poblarIntLote();
-renderDeu();
-document.getElementById('ef').value=new Date().toISOString().slice(0,10);
-document.getElementById('int-f1').value=new Date().toISOString().slice(0,10);
-document.getElementById('int-f2').value=new Date().toISOString().slice(0,10);
-listenCobros();
-listenEgresos();
-cargarTodosCobros();
-if(USER_ACTUAL) listenActividad();
-window.actualizarDeudaPreview();
+if(location.hash.startsWith('#verificar/')){
+  mostrarVerificacionPublica(decodeURIComponent(location.hash.replace('#verificar/','')));
+} else {
+  poblarSL();
+  poblarIntLote();
+  renderDeu();
+  document.getElementById('ef').value=new Date().toISOString().slice(0,10);
+  document.getElementById('int-f1').value=new Date().toISOString().slice(0,10);
+  document.getElementById('int-f2').value=new Date().toISOString().slice(0,10);
+  listenCobros();
+  listenEgresos();
+  cargarTodosCobros();
+  if(USER_ACTUAL) listenActividad();
+  window.actualizarDeudaPreview();
+}
 </script>
 </body>
 </html>
