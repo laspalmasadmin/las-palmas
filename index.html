@@ -225,6 +225,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <label>N° transacción / operación</label><input type="text" id="ilemon" placeholder="ej: 168224031768">
       <label style="margin-top:8px">Foto del comprobante (opcional)</label>
       <input type="file" id="icomprobante" accept="image/*" onchange="leerComprobante(this)">
+      <div id="ocr-estado" style="display:none;font-size:11px;margin-top:5px;font-weight:600"></div>
       <div id="comprobante-preview" style="display:none;margin-top:6px">
         <img id="comprobante-img" style="max-width:120px;border-radius:6px;border:1px solid #ddd;display:block">
         <button type="button" class="btn-sm" style="margin-top:4px;background:#fff;border-color:#c62828;color:#c62828" onclick="quitarComprobante()">✕ Quitar foto</button>
@@ -463,6 +464,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -925,25 +927,105 @@ window.leerComprobante = (input) => {
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
-      const max = 500;
-      let w = img.width, h = img.height;
+      // Versión chica para GUARDAR (Firestore tiene límite de 1MB por documento)
+      const canvasChico = document.createElement('canvas');
+      let w = img.width, h = img.height, max = 500;
       if(w > h && w > max){ h = Math.round(h*max/w); w = max; }
       else if(h > max){ w = Math.round(w*max/h); h = max; }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      window._comprobanteDataURL = canvas.toDataURL('image/jpeg', 0.45);
+      canvasChico.width = w; canvasChico.height = h;
+      canvasChico.getContext('2d').drawImage(img, 0, 0, w, h);
+      window._comprobanteDataURL = canvasChico.toDataURL('image/jpeg', 0.45);
       document.getElementById('comprobante-img').src = window._comprobanteDataURL;
       document.getElementById('comprobante-preview').style.display = 'block';
+
+      // Versión grande para LEER (el OCR necesita resolución; con 500px no lee bien)
+      const canvasGrande = document.createElement('canvas');
+      let gw = img.width, gh = img.height, gmax = 1600;
+      if(gw > gh && gw > gmax){ gh = Math.round(gh*gmax/gw); gw = gmax; }
+      else if(gh > gmax){ gw = Math.round(gw*gmax/gh); gh = gmax; }
+      canvasGrande.width = gw; canvasGrande.height = gh;
+      const ctx = canvasGrande.getContext('2d');
+      ctx.drawImage(img, 0, 0, gw, gh);
+      detectarNroOperacion(canvasGrande);
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 };
+
+// Lee el texto del comprobante (OCR) y trata de encontrar el N° de operación.
+// NO es infalible: si la foto sale borrosa o el banco usa un formato distinto,
+// puede no encontrarlo o leer mal un carácter — por eso el campo queda siempre
+// editable y se le avisa al usuario que lo verifique contra el comprobante.
+async function detectarNroOperacion(canvas){
+  const estado = document.getElementById('ocr-estado');
+  const campo = document.getElementById('ilemon');
+  if(campo.value.trim()) return; // si ya lo escribieron a mano, no lo pisamos
+  estado.style.display = 'block';
+  estado.style.color = '#8A8F86';
+  estado.textContent = '🔍 Leyendo el comprobante…';
+  try{
+    const { data } = await Tesseract.recognize(canvas, 'spa');
+    const texto = (data.text||'').replace(/\r/g,'');
+    const nro = extraerNroOperacion(texto);
+    if(nro){
+      campo.value = nro;
+      estado.style.color = '#1a7a4a';
+      estado.textContent = '✨ N° detectado de la foto — verificá que coincida con el comprobante';
+    } else {
+      estado.style.color = '#B24B3C';
+      estado.textContent = '⚠️ No pude leer el N° de operación — escribilo a mano arriba';
+    }
+  } catch(err){
+    estado.style.color = '#B24B3C';
+    estado.textContent = '⚠️ No pude leer la foto — escribí el N° a mano arriba';
+  }
+}
+
+// Busca el número de operación en el texto del comprobante. Primero intenta con
+// la etiqueta ("N° de operación", "Número de operación", "ID COELSA", etc.), que
+// es lo más confiable; si no la encuentra, cae a buscar el token más largo con
+// pinta de código de operación.
+function extraerNroOperacion(texto){
+  // Ojo con el orden: el número suele estar en el RENGLÓN SIGUIENTE a la etiqueta
+  // (Mercado Pago, Macro), así que esos patrones van primero. "Número de operación"
+  // tiene prioridad sobre "Código de identificación" / "ID COELSA" cuando aparecen los dos.
+  const etiquetas = [
+    /n[uú]mero\s+de\s+operaci[oó]n[^\n]*\n\s*([A-Z0-9]{6,})/i,
+    /n[°ºo]?\s*d[eo]\s*operaci[oó]n[^\n]*\n\s*([A-Z0-9]{6,})/i,
+    /n[uú]mero\s+de\s+operaci[oó]n[^A-Za-z0-9\n]*([A-Z0-9]{6,})/i,
+    /n[°ºo]?\s*d[eo]\s*operaci[oó]n[^A-Za-z0-9\n]*([A-Z0-9]{6,})/i,
+    /n[°ºo]?\s*de\s*comprobante[^\n]*\n\s*([A-Z0-9]{6,})/i,
+    /n[°ºo]?\s*de\s*transacci[oó]n[^\n]*\n\s*([A-Z0-9]{6,})/i,
+    /id\s*coelsa[^\n]*\n\s*([A-Z0-9]{6,})/i,
+    /c[oó]digo\s+de\s+identificaci[oó]n[^\n]*\n\s*([A-Z0-9]{6,})/i,
+  ];
+  for(const re of etiquetas){
+    const m = texto.match(re);
+    if(m && m[1]) return m[1].toUpperCase();
+  }
+  // Fallback: el token alfanumérico más largo (>=10) que no sea CBU/CVU/CUIT
+  const lineas = texto.split('\n');
+  let mejor = '';
+  for(const linea of lineas){
+    if(/cvu|cbu|cuit|cuil|alias|importe|monto|\$/i.test(linea)) continue;
+    const tokens = linea.match(/[A-Z0-9]{10,}/gi) || [];
+    for(const t of tokens){
+      if(/^\d{22}$/.test(t)) continue; // CVU/CBU
+      if(t.length > mejor.length) mejor = t;
+    }
+  }
+  return mejor ? mejor.toUpperCase() : null;
+}
+
 window.quitarComprobante = () => {
   window._comprobanteDataURL = '';
-  document.getElementById('icomprobante').value = '';
-  document.getElementById('comprobante-preview').style.display = 'none';
+  const inp = document.getElementById('icomprobante');
+  if(inp) inp.value = '';
+  const prev = document.getElementById('comprobante-preview');
+  if(prev) prev.style.display = 'none';
+  const est = document.getElementById('ocr-estado');
+  if(est) est.style.display = 'none';
 };
 
 window.registrar = async () => {
