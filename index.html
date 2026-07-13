@@ -2276,6 +2276,57 @@ function _qrDataURL(texto){
 
 // Construye el PDF del recibo con jsPDF, con el mismo estilo verde/dorado que
 // la rendición formal. Devuelve el objeto jsPDF (doc.output('blob') para compartir).
+// Convierte un monto a letras, como en los recibos y talonarios contables
+// ("Son pesos ciento ochenta y cinco mil con 00/100").
+function numeroALetras(n){
+  const UNI = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez',
+    'once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve',
+    'veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis',
+    'veintisiete','veintiocho','veintinueve'];
+  const DEC = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const CEN = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos',
+    'seiscientos','setecientos','ochocientos','novecientos'];
+
+  function hasta999(x){
+    if(x === 0) return '';
+    if(x === 100) return 'cien';
+    let t = '';
+    const c = Math.floor(x/100), r = x%100;
+    if(c) t += CEN[c];
+    if(r){
+      if(t) t += ' ';
+      if(r < 30) t += UNI[r];
+      else {
+        const d = Math.floor(r/10), u = r%10;
+        t += DEC[d] + (u ? ' y ' + UNI[u] : '');
+      }
+    }
+    return t;
+  }
+
+  const entero = Math.floor(Math.abs(n));
+  const centavos = Math.round((Math.abs(n) - entero) * 100);
+  if(entero === 0) return 'cero con ' + String(centavos).padStart(2,'0') + '/100';
+
+  const millones = Math.floor(entero / 1000000);
+  const miles = Math.floor((entero % 1000000) / 1000);
+  const resto = entero % 1000;
+
+  let txt = '';
+  if(millones){
+    txt += (millones === 1 ? 'un millón' : hasta999(millones) + ' millones');
+  }
+  if(miles){
+    if(txt) txt += ' ';
+    txt += (miles === 1 ? 'mil' : hasta999(miles) + ' mil');
+  }
+  if(resto){
+    if(txt) txt += ' ';
+    txt += hasta999(resto);
+  }
+  return txt + ' con ' + String(centavos).padStart(2,'0') + '/100';
+}
+
 function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   const { jsPDF } = window.jspdf;
   const docPDF = new jsPDF({unit:'mm', format:'a5'});
@@ -2365,7 +2416,15 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.setFontSize(13); docPDF.setTextColor(...verde);
   docPDF.text(`$${Math.round(cobro.monto).toLocaleString('es-AR')}`, W-14, y+9.5, {align:'right'});
 
-  y += 20;
+  // Monto en letras (como en todo recibo contable)
+  y += 18;
+  docPDF.setFontSize(7); docPDF.setTextColor(80,80,80);
+  const enLetras = docPDF.splitTextToSize(
+    'Son pesos ' + numeroALetras(cobro.monto || 0) + '.',
+    W-20
+  );
+  docPDF.text(enLetras, 10, y);
+  y += (enLetras.length * 3) + 1;
   const qrImg = _qrDataURL(meta.urlVerificacion);
   if(qrImg){ docPDF.addImage(qrImg, 'PNG', 10, y, 20, 20); }
   docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
