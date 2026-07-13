@@ -224,7 +224,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg" id="fg-lemon" style="display:none">
       <label>N° transacción / operación</label><input type="text" id="ilemon" placeholder="ej: 168224031768">
       <label style="margin-top:8px">Foto del comprobante (opcional)</label>
-      <input type="file" id="icomprobante" accept="image/*" capture="environment" onchange="leerComprobante(this)">
+      <input type="file" id="icomprobante" accept="image/*" onchange="leerComprobante(this)">
       <div id="comprobante-preview" style="display:none;margin-top:6px">
         <img id="comprobante-img" style="max-width:120px;border-radius:6px;border:1px solid #ddd;display:block">
         <button type="button" class="btn-sm" style="margin-top:4px;background:#fff;border-color:#c62828;color:#c62828" onclick="quitarComprobante()">✕ Quitar foto</button>
