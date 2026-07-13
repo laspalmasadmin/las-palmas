@@ -781,14 +781,16 @@ window.cambiarMes = val => {
 // FIREBASE LISTENERS
 // 🧪 MODO_PRUEBA: esta branch es para que Juan y Walter prueben el circuito con un
 // lote real (lectura normal), pero todo lo que se REGISTRA (cobro, recibo, numeración)
-// se guarda en colecciones separadas con prefijo PRUEBA_, para no tocar la deuda ni
-// la rendición real. Para pasar esto a producción de verdad, hay que sacar este flag.
+// se guarda ANIDADO bajo PRUEBA/sandbox/..., para no tocar la deuda ni la rendición
+// real. Va todo bajo un mismo padre para que UNA sola regla de Firestore lo cubra.
+// Para pasar esto a producción de verdad, hay que sacar este flag.
 const MODO_PRUEBA = true;
 if(MODO_PRUEBA){
   const _b = document.getElementById('banner-prueba');
   if(_b) _b.style.display = 'block';
 }
-function colC(){ return (MODO_PRUEBA?'PRUEBA_':'') + 'C_' + MES.replace('-',''); }
+const PRUEBA_BASE = 'PRUEBA/sandbox/';
+function colC(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_' + MES.replace('-',''); }
 function colE(){ return 'E_' + MES.replace('-',''); }
 
 // Cargar cobros de todos los meses para calcDeudaEfectiva
@@ -2281,7 +2283,7 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) =>
       lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA,
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString()
     };
-    await addDoc(collection(db, MODO_PRUEBA?'PRUEBA_RECIBOS':'RECIBOS'), reciboDoc);
+    await addDoc(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), reciboDoc);
 
     const meta = {recibo:numero, codigo, urlVerificacion, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
     const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
@@ -2315,7 +2317,7 @@ async function mostrarVerificacionPublica(codigo){
   document.getElementById('verificar-screen').style.display='block';
   const body = document.getElementById('verificar-body');
   try{
-    const q = query(collection(db, MODO_PRUEBA?'PRUEBA_RECIBOS':'RECIBOS'), where('codigo','==',codigo));
+    const q = query(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), where('codigo','==',codigo));
     const snap = await getDocs(q);
     if(snap.empty){
       body.innerHTML = `<div style="text-align:center;padding:20px 0">
