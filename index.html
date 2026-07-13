@@ -202,6 +202,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <select id="sc" onchange="actualizarDeudaPreview();renderInteresPeriodos()">
         <option value="ordinaria">Exp. Ordinaria</option>
         <option value="extraordinaria">Exp. Extraordinaria</option>
+        <option value="ambas">Ambas (Ordinaria + Extraordinaria)</option>
         <option value="cargo">Cargo</option>
       </select>
     </div>
@@ -884,8 +885,8 @@ function renderCob(){
     const ok = cobs.length>0;
     // Ordinaria/Extraordinaria/Cargo muestran SOLO capital (el interés se ve aparte,
     // abajo) para no duplicar esa plata entre las dos líneas de la tarjeta.
-    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
-    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
+    let ord=0, ext=0, car=0;
+    cobs.forEach(c=>{ const d=desglosarCobro(c); ord+=d.capOrd; ext+=d.capExt; car+=d.capCargo; });
     const conceptos=[
       ord?`<span style="color:#1565c0;font-size:11px">Ord: ${fa(ord)}</span>`:'',
       ext?`<span style="color:#1a7a4a;font-size:11px">Ext: ${fa(ext)}</span>`:'',
@@ -916,7 +917,7 @@ function renderCob(){
   }).join('');
 }
 
-function tipoL(t){ return t==='ordinaria'?'Exp. Ordinaria':t==='extraordinaria'?'Exp. Extraordinaria':'Cargo'; }
+function tipoL(t){ return t==='ordinaria'?'Exp. Ordinaria':t==='extraordinaria'?'Exp. Extraordinaria':t==='ambas'?'Exp. Ordinaria + Extraordinaria':'Cargo'; }
 
 // Poblar select lotes
 function poblarSL(){
@@ -1378,11 +1379,14 @@ function renderRend(){
     const cobs=porLote[n];
     // Ordinaria/Extraordinaria muestran SOLO capital (sin el interés adentro),
     // para que las columnas de Interés no dupliquen plata que ya está contada ahí.
-    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
-    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
-    // Interés separado: el de cobros de ordinaria vs el de cobros de extraordinaria
-    const intOrd=cobs.filter(c=>c.conc==='ordinaria').reduce((s,c)=>s+(c.interes||0),0);
-    const intExt=cobs.filter(c=>c.conc==='extraordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    // El desglose sale de los PERÍODOS de cada cobro, así un solo cobro puede
+    // tener ordinaria y extraordinaria a la vez (un pago = un recibo).
+    let ord=0, ext=0, car=0, intOrd=0, intExt=0;
+    cobs.forEach(c=>{
+      const d = desglosarCobro(c);
+      ord+=d.capOrd; ext+=d.capExt; car+=d.capCargo;
+      intOrd+=d.intOrd; intExt+=d.intExt;
+    });
     const tot=ord+ext+car+intOrd+intExt;
     sO+=ord;sE+=ext;sC+=car;sIo+=intOrd;sIe+=intExt;sT+=tot;
     const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
@@ -1581,12 +1585,29 @@ function calcDeudaEfectiva(d){
 
 // Devuelve, para un lote y concepto, los períodos con deuda pendiente (deuda ya
 // descontada de los cobros existentes), ordenados del más antiguo al más nuevo.
+// Con conc='ambas' devuelve ordinaria Y extraordinaria intercaladas en orden
+// cronológico real de vencimiento (Art. 8°: se imputa primero la deuda más vieja).
 function getDeudaLotePeriodos(n, conc){
   const loteInfo = LB.find(x=>x.n===n);
   if(!loteInfo) return [];
   const base = DEU.find(d=>d.l===loteInfo.l);
   if(!base) return [];
   const efectivo = calcDeudaEfectiva(base);
+
+  if(conc === 'ambas'){
+    const etiqueta = {};
+    PERIODOS_ORD.forEach(p=>etiqueta[p.k]=p.label);
+    PERIODOS_EXT.forEach(p=>etiqueta[p.k]=p.label);
+    const orden = [];
+    MI.forEach(m=>{                       // MI ya está en orden cronológico
+      if(m.co) orden.push(m.co);          // dentro del mes: primero ordinaria
+      if(m.cx) orden.push(m.cx);          // después extraordinaria
+    });
+    return orden
+      .map(k=>({k, label: etiqueta[k]||k, monto: efectivo[k]||0}))
+      .filter(p=>p.monto>0);
+  }
+
   const lista = conc==='extraordinaria' ? PERIODOS_EXT : PERIODOS_ORD;
   return lista.map(p=>({...p, monto: efectivo[p.k]||0})).filter(p=>p.monto>0);
 }
@@ -1600,7 +1621,9 @@ window.actualizarDeudaPreview = () => {
   const conc = document.getElementById('sc').value;
   if(!n || conc==='cargo'){ el.style.display='none'; return; }
   const periodos = getDeudaLotePeriodos(n, conc);
-  const condLabel = conc==='extraordinaria'?'extraordinaria':'ordinaria';
+  const condLabel = conc==='extraordinaria' ? 'extraordinaria'
+                  : conc==='ambas' ? 'ordinaria ni extraordinaria'
+                  : 'ordinaria';
   el.style.display='block';
   if(!periodos.length){
     el.innerHTML = `<span style="font-size:11px;color:#1a7a4a;font-weight:700">✓ Sin deuda pendiente de expensa ${condLabel}</span>`;
@@ -1635,6 +1658,51 @@ function filaCapInt(label, capId, capVal, intId, intVal, onCambio){
 // y un input de Interés (ambos editables a mano). El capital se prellena con la
 // deuda pendiente real de ese período como sugerencia, pero se puede sobrescribir.
 // Si no hay ningún período tildado, muestra una fila "General" para pagos sueltos.
+// Desglosa un cobro en capital/interés de ordinaria y de extraordinaria.
+// Lo deduce de los PERÍODOS (jul_ord / jul_ext / xy / oy...), que ya vienen
+// discriminados, así un mismo cobro puede tener las dos cosas a la vez.
+// Si el cobro no tiene períodos claros (datos viejos, o período "otro"),
+// cae al campo `conc` de siempre — por eso los meses ya cerrados dan igual que antes.
+const CLAVES_EXT = new Set(PERIODOS_EXT.map(p=>p.k));
+const CLAVES_ORD = new Set(PERIODOS_ORD.map(p=>p.k));
+function desglosarCobro(c){
+  const r = {capOrd:0, capExt:0, capCargo:0, intOrd:0, intExt:0};
+  const capPer = c.capitalPer || {};
+  const intPer = c.interesPer || {};
+  const claves = new Set([...Object.keys(capPer), ...Object.keys(intPer)]);
+  const clasificables = [...claves].filter(k=>CLAVES_ORD.has(k)||CLAVES_EXT.has(k));
+
+  if(clasificables.length){
+    // Camino nuevo: se deduce de los períodos
+    let capClasificado = 0, intClasificado = 0;
+    clasificables.forEach(k=>{
+      const cap = capPer[k]||0, int = intPer[k]||0;
+      if(CLAVES_EXT.has(k)){ r.capExt += cap; r.intExt += int; }
+      else { r.capOrd += cap; r.intOrd += int; }
+      capClasificado += cap; intClasificado += int;
+    });
+    // Lo que quedó sin clasificar (ej: período "otro" mezclado) va al concepto del cobro
+    const capTotal = Object.values(capPer).reduce((s,v)=>s+v,0);
+    const intTotal = c.interes || Object.values(intPer).reduce((s,v)=>s+v,0);
+    const capResto = capTotal - capClasificado;
+    const intResto = intTotal - intClasificado;
+    if(capResto || intResto){
+      if(c.conc==='extraordinaria'){ r.capExt += capResto; r.intExt += intResto; }
+      else if(c.conc==='cargo'){ r.capCargo += capResto; }
+      else { r.capOrd += capResto; r.intOrd += intResto; }
+    }
+    return r;
+  }
+
+  // Camino viejo (compatibilidad): todo el cobro va al concepto que tenga
+  const interes = c.interes || 0;
+  const capital = (c.monto||0) - interes;
+  if(c.conc==='extraordinaria'){ r.capExt = capital; r.intExt = interes; }
+  else if(c.conc==='cargo'){ r.capCargo = capital; r.intOrd = interes; }
+  else { r.capOrd = capital; r.intOrd = interes; }
+  return r;
+}
+
 window.renderInteresPeriodos = () => {
   const n = parseInt(document.getElementById('sl').value);
   const conc = document.getElementById('sc').value;
@@ -3040,10 +3108,12 @@ window.imprimirRend=()=>{
     const b=LB.find(x=>x.n===n);
     if(!b) return;
     const cobs=porLote[n];
-    const gm=t=>cobs.filter(c=>c.conc===t).reduce((s,c)=>s+(c.monto-(c.interes||0)),0);
-    const ord=gm('ordinaria'),ext=gm('extraordinaria'),car=gm('cargo');
-    const intOrd=cobs.filter(c=>c.conc==='ordinaria').reduce((s,c)=>s+(c.interes||0),0);
-    const intExt=cobs.filter(c=>c.conc==='extraordinaria').reduce((s,c)=>s+(c.interes||0),0);
+    let ord=0, ext=0, car=0, intOrd=0, intExt=0;
+    cobs.forEach(c=>{
+      const d = desglosarCobro(c);
+      ord+=d.capOrd; ext+=d.capExt; car+=d.capCargo;
+      intOrd+=d.intOrd; intExt+=d.intExt;
+    });
     const tot=ord+ext+car+intOrd+intExt;
     sO+=ord;sE+=ext;sC+=car;sIo+=intOrd;sIe+=intExt;sT+=tot;
     const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join('/');
