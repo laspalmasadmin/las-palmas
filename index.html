@@ -2283,18 +2283,24 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   const verde=[31,77,61], dorado=[169,133,63], crema=[250,246,238];
 
   docPDF.setFillColor(...verde);
-  docPDF.rect(0,0,W,26,'F');
+  docPDF.rect(0,0,W,34,'F');
   docPDF.setTextColor(255,255,255);
-  docPDF.setFontSize(11);
-  docPDF.text('Consorcio de Propietarios', W/2, 9, {align:'center'});
+  docPDF.setFontSize(10);
+  docPDF.text('Consorcio de Propietarios', W/2, 8, {align:'center'});
   docPDF.setTextColor(...dorado);
   docPDF.setFontSize(13);
-  docPDF.text('Barrio Las Palmas', W/2, 15.5, {align:'center'});
+  docPDF.text('Barrio Las Palmas', W/2, 14.5, {align:'center'});
   docPDF.setTextColor(220,235,228);
-  docPDF.setFontSize(8);
-  docPDF.text('William Cross 3302, Las Talitas, Tucumán', W/2, 21, {align:'center'});
+  docPDF.setFontSize(7);
+  docPDF.text('Domicilio: William Cross 3302 · Las Talitas, Tucumán', W/2, 20, {align:'center'});
+  docPDF.text('Administradores: Juan Ponce · Walter Vallejo', W/2, 24, {align:'center'});
+  docPDF.setFontSize(6.5);
+  docPDF.text('Tel: 3814097776 / 3815995289 · juanlponce@hotmail.com · walterdariov@yahoo.com.ar', W/2, 28, {align:'center'});
+  docPDF.setTextColor(...dorado);
+  docPDF.setFontSize(6.5);
+  docPDF.text('Contadora: Juana B. Varvaro — Contadora Pública Nacional · M.P. 7450', W/2, 31.8, {align:'center'});
 
-  let y = 34;
+  let y = 42;
   docPDF.setTextColor(30,30,30);
   docPDF.setFontSize(9);
   docPDF.text('Recibo', 10, y);
@@ -2325,12 +2331,15 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.text('Conceptos', 10, y);
   y += 4;
   docPDF.setFontSize(8);
+  // Si el propietario adeuda muchos períodos, compacta el interlineado para que
+  // el pie (firmas + leyenda legal) no se caiga de la hoja A5.
+  const pasoConcepto = conceptos.length > 6 ? 4 : 5;
   conceptos.forEach(c=>{
     docPDF.setTextColor(60,60,60);
     docPDF.text(c.label, 10, y);
     docPDF.setTextColor(30,30,30);
     docPDF.text(`$${Math.round(c.subtotal).toLocaleString('es-AR')}`, W-10, y, {align:'right'});
-    y += 5;
+    y += pasoConcepto;
     docPDF.setDrawColor(240,240,240);
     docPDF.line(10, y-1.5, W-10, y-1.5);
   });
@@ -2374,6 +2383,18 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.text(meta.firmante||'Juan Ponce / Walter Vallejo', 14, y+4);
   docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
   docPDF.text('Administrador', 14, y+8);
+
+  // Leyenda legal al pie
+  y += 15;
+  docPDF.setDrawColor(225,225,225);
+  docPDF.line(10, y, W-10, y);
+  y += 4;
+  docPDF.setFontSize(5.8); docPDF.setTextColor(130,130,130);
+  const leyenda = docPDF.splitTextToSize(
+    'Recibo emitido conforme al Reglamento de Copropiedad homologado por Juzgado Civil y Comercial I° Nominación (Expte. 35/22). Documento verificable en línea mediante el código QR.',
+    W-20
+  );
+  docPDF.text(leyenda, W/2, y, {align:'center'});
 
   return docPDF;
 }
