@@ -183,6 +183,17 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <button class="btn az" onclick="importar()">📥 Importar al mes actual</button>
     <button class="btn rj" onclick="limpiar()" style="margin-top:6px">🗑 Limpiar todos los cobros del mes</button>
   </div>
+  <!-- Backup / Exportar -->
+  <div class="card" id="card-backup">
+    <div class="ct">💾 Backup de respaldo</div>
+    <div style="font-size:11px;color:#777;margin-bottom:8px;line-height:1.4">
+      Descarga una copia de los <b>cobros</b> y <b>recibos digitales</b> de TODOS los meses.
+      Guardalo en la carpeta BACKUPS del Drive del consorcio.
+    </div>
+    <button class="btn az" id="btn-exp-excel" onclick="exportarBackup('excel')">📊 Descargar Excel (para leer)</button>
+    <button class="btn az" id="btn-exp-json" onclick="exportarBackup('json')" style="margin-top:6px">🔧 Descargar JSON (para restaurar)</button>
+    <div id="backup-estado" style="display:none;font-size:11px;margin-top:8px;font-weight:600"></div>
+  </div>
   <!-- Registrar -->
   <div class="card">
     <div class="ct">➕ Registrar cobro</div>
@@ -498,7 +509,7 @@ function aplicarModoConsulta(){
   // Ocultar botones de acción
   document.querySelectorAll('.btn.rj, .btn.az, #btn-reg, .btn-ed, .btn-dl, #btn-se, #btn-se2').forEach(el=>el.style.display='none');
   // Ocultar formularios de carga
-  ['imp-file','btn-imp','btn-imp2','fg-lemon'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  ['imp-file','btn-imp','btn-imp2','fg-lemon','card-backup'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   // Ocultar tab actividad
   document.querySelectorAll('.tab').forEach(t=>{ if(t.textContent.includes('Actividad')) t.style.display='none'; });
   // Mostrar badge solo lectura
@@ -1086,6 +1097,142 @@ window.registrar = async () => {
   } catch(e){ toast('❌ Error: '+e.message); }
   btn.disabled=false; btn.textContent='✓ Registrar cobro';
 };
+
+// ── BACKUP / EXPORTAR ──────────────────────────────────────────────────
+// Descarga una copia de respaldo de cobros y recibos digitales de todos los
+// meses. Es de SOLO LECTURA: no modifica ni borra nada de Firestore.
+// El Excel es para leer/auditar a mano; el JSON es el que sirve para restaurar.
+const MESES_BACKUP = ['202601','202602','202603','202604','202605','202606','202607','202608','202609','202610','202611','202612'];
+
+window.exportarBackup = async (formato) => {
+  const est = document.getElementById('backup-estado');
+  const btnE = document.getElementById('btn-exp-excel');
+  const btnJ = document.getElementById('btn-exp-json');
+  btnE.disabled = true; btnJ.disabled = true;
+  est.style.display = 'block';
+  est.style.color = '#777';
+  est.textContent = '⏳ Juntando la información…';
+
+  try{
+    // 1) Cobros de todos los meses
+    const cobros = [];
+    for(const m of MESES_BACKUP){
+      try{
+        const snap = await getDocs(collection(db, (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_' + m));
+        snap.forEach(d=>{
+          const c = d.data();
+          const lote = LB.find(x=>x.n===parseInt(c.n));
+          cobros.push({
+            mes: m.slice(0,4)+'-'+m.slice(4),
+            lote: lote?lote.l:('Lote '+c.n),
+            propietario: lote?lote.p:'',
+            concepto: c.conc||'',
+            periodos: Array.isArray(c.per)?c.per.join(' '):(c.per||''),
+            monto: c.monto||0,
+            interes: c.interes||0,
+            forma: c.forma||'',
+            recibo: c.recibo||'',
+            fecha: c.fecha||'',
+            nroOperacion: c.lemon||'',
+            observacion: c.obs||'',
+            _id: d.id
+          });
+        });
+      }catch(e){ /* mes sin datos, sigue */ }
+    }
+
+    // 2) Recibos digitales
+    const recibos = [];
+    try{
+      const snapR = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
+      snapR.forEach(d=>{
+        const r = d.data();
+        recibos.push({
+          recibo: r.recibo||'',
+          codigo: r.codigo||'',
+          lote: r.lote||'',
+          propietario: r.propietario||'',
+          total: r.total||0,
+          forma: r.forma||'',
+          nroOperacion: r.lemon||'',
+          fecha: r.fecha||'',
+          mes: r.mes||'',
+          generadoPor: r.generadoPor||'',
+          timestamp: r.timestamp||'',
+          conceptos: Array.isArray(r.conceptos) ? r.conceptos.map(c=>`${c.label}: cap ${c.cap} + int ${c.int}`).join(' | ') : '',
+          urlVerificacion: r.urlVerificacion||'',
+          _id: d.id
+        });
+      });
+    }catch(e){ /* sin recibos todavía */ }
+
+    if(!cobros.length && !recibos.length){
+      est.style.color='#B24B3C';
+      est.textContent = '⚠️ No hay nada para respaldar todavía';
+      btnE.disabled=false; btnJ.disabled=false;
+      return;
+    }
+
+    const hoy = new Date().toISOString().slice(0,10);
+    const sufijo = MODO_PRUEBA ? '_PRUEBA' : '';
+
+    if(formato === 'json'){
+      const backup = {
+        generado: new Date().toISOString(),
+        origen: 'Barrio Las Palmas — app de administración',
+        modoPrueba: MODO_PRUEBA,
+        totales: {cobros: cobros.length, recibos: recibos.length},
+        cobros,
+        recibos
+      };
+      descargarArchivo(
+        new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'}),
+        `Backup_LasPalmas_${hoy}${sufijo}.json`
+      );
+    } else {
+      // Excel real (.xls por HTML): dos hojas, se abre bien en Excel y Google Sheets
+      const hojaCobros = tablaHTML(cobros, ['mes','lote','propietario','concepto','periodos','monto','interes','forma','recibo','fecha','nroOperacion','observacion']);
+      const hojaRecibos = tablaHTML(recibos, ['recibo','codigo','lote','propietario','total','forma','nroOperacion','fecha','mes','conceptos','generadoPor','urlVerificacion']);
+      const xls = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Worksheet ss:Name="Cobros">${hojaCobros}</Worksheet>
+ <Worksheet ss:Name="Recibos">${hojaRecibos}</Worksheet>
+</Workbook>`;
+      descargarArchivo(
+        new Blob([xls], {type:'application/vnd.ms-excel'}),
+        `Backup_LasPalmas_${hoy}${sufijo}.xls`
+      );
+    }
+
+    est.style.color='#1a7a4a';
+    est.textContent = `✅ Listo: ${cobros.length} cobros y ${recibos.length} recibos. Subilo a la carpeta BACKUPS del Drive.`;
+  }catch(err){
+    est.style.color='#B24B3C';
+    est.textContent = '❌ Error al generar el backup: ' + err.message;
+  }
+  btnE.disabled=false; btnJ.disabled=false;
+};
+
+// Arma una hoja de cálculo (formato SpreadsheetML) a partir de un array de objetos
+function tablaHTML(filas, columnas){
+  const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const celda = v => typeof v === 'number'
+    ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
+    : `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+  const encabezado = `<Row>${columnas.map(c=>`<Cell><Data ss:Type="String">${esc(c)}</Data></Cell>`).join('')}</Row>`;
+  const cuerpo = filas.map(f=>`<Row>${columnas.map(c=>celda(f[c])).join('')}</Row>`).join('');
+  return `<Table>${encabezado}${cuerpo}</Table>`;
+}
+
+function descargarArchivo(blob, nombre){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
 
 // Importar JSON
 window.importar = async () => {
