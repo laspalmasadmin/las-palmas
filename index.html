@@ -2223,6 +2223,7 @@ window.calcLote=()=>{
       </div>
       <div style="font-size:9px;color:#aaa;text-align:center;margin-top:8px">Tasa: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes</div>
       <button onclick="imprimirLote()" style="width:100%;margin-top:10px;padding:10px;background:#1565c0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir liquidación</button>
+      ${capOrd&&capExt?`<button onclick="generarCobroDesdeLiquidacion('ambas')" style="width:100%;margin-top:8px;padding:10px;background:#1a7a4a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🧾 Generar cobro — Total Ord + Ext, un solo recibo (${fa(totGen)})</button>`:''}
       ${capOrd?`<button onclick="generarCobroDesdeLiquidacion('ordinaria')" style="width:100%;margin-top:8px;padding:10px;background:#fff;color:#1565c0;border:2px solid #1565c0;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">➡️ Generar cobro — Exp. Ordinaria (${fa(totOrd)})</button>`:''}
       ${capExt?`<button onclick="generarCobroDesdeLiquidacion('extraordinaria')" style="width:100%;margin-top:8px;padding:10px;background:#fff;color:#1a7a4a;border:2px solid #1a7a4a;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">➡️ Generar cobro — Exp. Extraordinaria (${fa(totExt)})</button>`:''}
     </div>`;
@@ -2245,8 +2246,9 @@ window.generarCobroDesdeLiquidacion = (tipo) => {
   document.getElementById('sl').value = d.loteN;
   document.getElementById('sc').value = tipo;
 
-  // Tildar solo los períodos de este concepto que tengan capital pendiente
-  const periodosTipo = d.periodosBreak.filter(p=>p.tipo===tipo);
+  // Tildar los períodos con capital pendiente: si es 'ambas' (recibo único
+  // Ord+Ext), se incluyen los de los dos tipos; si no, solo los de ese concepto.
+  const periodosTipo = tipo==='ambas' ? d.periodosBreak : d.periodosBreak.filter(p=>p.tipo===tipo);
   document.querySelectorAll('input[name="sper"]').forEach(cb=>{ cb.checked = periodosTipo.some(p=>p.campo===cb.value); });
 
   // Precarga capital (sugerido por deuda real) + fecha, luego pisamos el interés
@@ -2321,9 +2323,15 @@ function _conceptosDesdeForm(cobro, capitalPer, interesPer){
   if(!claves.length){
     return [{label:tipoLabel, cap:0, int:0, subtotal:0}];
   }
+  const esOrd = k => PERIODOS_ORD.some(p=>p.k===k);
+  const esExt = k => PERIODOS_EXT.some(p=>p.k===k);
   return claves.map(k=>{
     const cap = capitalPer[k]||0, int = interesPer[k]||0;
-    return {label:`${PERIOD_LABELS[k]||k} · ${tipoLabel}`, cap, int, subtotal:cap+int};
+    // El tipo de cada línea sale del período real (oa/xa/etc), no del concepto
+    // general del cobro — así en un recibo combinado (ambas) cada renglón se
+    // etiqueta bien como Ordinaria o Extraordinaria según corresponda.
+    const tipoLinea = esOrd(k) ? 'Exp. Ordinaria' : esExt(k) ? 'Exp. Extraordinaria' : tipoLabel;
+    return {label:`${PERIOD_LABELS[k]||k} · ${tipoLinea}`, cap, int, subtotal:cap+int};
   });
 }
 
