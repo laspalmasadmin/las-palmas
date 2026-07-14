@@ -2294,17 +2294,18 @@ function _codigoAleatorio(n){
 // NOTA: no es 100% atómico frente a dos usuarios generando el PRIMER recibo
 // digital en el mismo instante (caso muy poco probable) — para uso normal,
 // con el contador ya creado, sí queda protegido con transacción.
+// Numeración correlativa de recibos digitales.
+// Confirmado con la Administración: el talonario físico llega hasta el 500,
+// así que el PRIMER recibo digital es el 501. Se arranca el contador en 500
+// y cada recibo toma el siguiente número dentro de una transacción, para que
+// dos personas emitiendo a la vez no puedan repetir número.
+const ULTIMO_RECIBO_PAPEL = 500;
+
 async function obtenerProximoReciboDigital(){
   const contadorRef = doc(db, '_contadores', MODO_PRUEBA ? 'recibos_prueba' : 'recibos');
-  const snap = await getDoc(contadorRef);
-  if(!snap.exists()){
-    const seed = prompt('Primera vez que se genera un recibo digital.\n\n¿Cuál es el ÚLTIMO número de recibo ya entregado en el talonario físico? (confirmá con Juan o Walter antes de poner un número)\n\nEl próximo recibo digital será ese número + 1.');
-    const seedNum = parseInt(seed);
-    await setDoc(contadorRef, {ultimo: isNaN(seedNum) ? 375 : seedNum});
-  }
   return await runTransaction(db, async tx=>{
     const s = await tx.get(contadorRef);
-    const ultimo = (s.data()&&s.data().ultimo) || 0;
+    const ultimo = (s.exists() && s.data() && s.data().ultimo) || ULTIMO_RECIBO_PAPEL;
     const proximo = ultimo+1;
     tx.set(contadorRef, {ultimo: proximo});
     return proximo;
@@ -2521,14 +2522,17 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
   docPDF.text('Administrador', 14, y+8);
 
-  // Leyenda legal al pie
-  y += 15;
+  // Leyenda legal al pie.
+  // La reserva de intereses NO es decorativa: el art. 899 inc. c) del CCCN
+  // presume que si se da recibo por el capital SIN reservar los intereses,
+  // los intereses quedan extinguidos. Esta cláusula evita esa pérdida.
+  y += 13;
   docPDF.setDrawColor(225,225,225);
   docPDF.line(10, y, W-10, y);
   y += 4;
-  docPDF.setFontSize(5.8); docPDF.setTextColor(130,130,130);
+  docPDF.setFontSize(5.6); docPDF.setTextColor(130,130,130);
   const leyenda = docPDF.splitTextToSize(
-    'Recibo emitido conforme al Reglamento de Copropiedad homologado por Juzgado Civil y Comercial I° Nominación (Expte. 35/22). Documento verificable en línea mediante el código QR.',
+    'El presente recibo se otorga sin perjuicio de los intereses, gastos y demás accesorios devengados y no incluidos en el detalle precedente, cuyo cobro el Consorcio se reserva expresamente (art. 899 CCCN). Su recepción no importa novación de la obligación original (Art. 8° del Reglamento). Reglamento de Copropiedad y Administración homologado por el Juzgado Civil y Comercial Común I° Nominación de Tucumán, Expte. N° 35/22. Documento verificable en línea mediante el código QR.',
     W-20
   );
   docPDF.text(leyenda, W/2, y, {align:'center'});
