@@ -2315,8 +2315,9 @@ async function obtenerProximoReciboDigital(){
 }
 
 // Arma el array de conceptos (período + capital + interés) a partir de lo que
-// se tipeó/editó en el formulario — capital e interés siempre por separado,
-// tal cual salió de la liquidación (o editado a mano si pagó menos).
+// se tipeó/editó en el formulario. Capital e interés van en LÍNEAS SEPARADAS
+// (ej: "Abr ord · Exp. Ordinaria" y "Abr ord · Interés Ordinaria"), igual que
+// en un recibo de expensas tradicional — no un subtotal combinado.
 function _conceptosDesdeForm(cobro, capitalPer, interesPer){
   const claves = [...new Set([...Object.keys(capitalPer), ...Object.keys(interesPer)])];
   const tipoLabel = tipoL(cobro.conc);
@@ -2325,14 +2326,21 @@ function _conceptosDesdeForm(cobro, capitalPer, interesPer){
   }
   const esOrd = k => PERIODOS_ORD.some(p=>p.k===k);
   const esExt = k => PERIODOS_EXT.some(p=>p.k===k);
-  return claves.map(k=>{
+  const lineas = [];
+  claves.forEach(k=>{
     const cap = capitalPer[k]||0, int = interesPer[k]||0;
     // El tipo de cada línea sale del período real (oa/xa/etc), no del concepto
     // general del cobro — así en un recibo combinado (ambas) cada renglón se
     // etiqueta bien como Ordinaria o Extraordinaria según corresponda.
-    const tipoLinea = esOrd(k) ? 'Exp. Ordinaria' : esExt(k) ? 'Exp. Extraordinaria' : tipoLabel;
-    return {label:`${PERIOD_LABELS[k]||k} · ${tipoLinea}`, cap, int, subtotal:cap+int};
+    let labelCap, labelInt;
+    if(esOrd(k)){ labelCap = `${PERIOD_LABELS[k]} · Exp. Ordinaria`; labelInt = `${PERIOD_LABELS[k]} · Interés Ordinaria`; }
+    else if(esExt(k)){ labelCap = `${PERIOD_LABELS[k]} · Exp. Extraordinaria`; labelInt = `${PERIOD_LABELS[k]} · Interés Extraordinaria`; }
+    else { labelCap = tipoLabel; labelInt = `${tipoLabel} · Interés`; }
+    if(cap) lineas.push({label:labelCap, cap, int:0, subtotal:cap});
+    if(int) lineas.push({label:labelInt, cap:0, int, subtotal:int});
   });
+  if(!lineas.length) lineas.push({label:tipoLabel, cap:0, int:0, subtotal:0});
+  return lineas;
 }
 
 // Genera el QR como imagen (dataURL) usando qrcode.min.js. Si por algún motivo
@@ -2468,24 +2476,19 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.setFontSize(8); docPDF.setTextColor(140,140,140);
   docPDF.text('Conceptos', 10, y);
   y += 4;
-  // Si el propietario adeuda muchos períodos, compacta el interlineado para que
-  // el pie (firmas + leyenda legal) no se caiga de la hoja A5. Cuando un concepto
-  // tiene interés, se agrega una segunda línea chica con el desglose Cap/Int.
-  const compacto = conceptos.length > 4;
-  const pasoLinea = compacto ? 3.8 : 5;
-  const pasoIntLinea = compacto ? 3 : 3.5;
+  // Si el propietario adeuda muchos períodos (capital + interés van en líneas
+  // separadas), compacta el interlineado para que el pie (firma + leyenda
+  // legal) no se caiga de la hoja A5.
+  const compacto = conceptos.length > 6;
+  const pasoLinea = compacto ? 4 : 5;
   conceptos.forEach(c=>{
+    const esLineaInteres = c.int>0 && !c.cap;
     docPDF.setFontSize(compacto?7:8);
-    docPDF.setTextColor(60,60,60);
+    docPDF.setTextColor(esLineaInteres?150:60, esLineaInteres?150:60, esLineaInteres?150:60);
     docPDF.text(c.label, 10, y);
     docPDF.setTextColor(30,30,30);
     docPDF.text(`$${Math.round(c.subtotal).toLocaleString('es-AR')}`, W-10, y, {align:'right'});
     y += pasoLinea;
-    if(c.int>0){
-      docPDF.setFontSize(compacto?5.5:6.5); docPDF.setTextColor(150,150,150);
-      docPDF.text(`Cap: $${Math.round(c.cap).toLocaleString('es-AR')}  ·  Int: $${Math.round(c.int).toLocaleString('es-AR')}`, 10, y);
-      y += pasoIntLinea;
-    }
     docPDF.setDrawColor(240,240,240);
     docPDF.line(10, y-1.5, W-10, y-1.5);
   });
