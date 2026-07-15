@@ -798,12 +798,10 @@ window.cambiarMes = val => {
 };
 
 // FIREBASE LISTENERS
-// 🧪 MODO_PRUEBA: esta branch es para que Juan y Walter prueben el circuito con un
-// lote real (lectura normal), pero todo lo que se REGISTRA (cobro, recibo, numeración)
-// se guarda ANIDADO bajo PRUEBA/sandbox/..., para no tocar la deuda ni la rendición
-// real. Va todo bajo un mismo padre para que UNA sola regla de Firestore lo cubra.
-// Para pasar esto a producción de verdad, hay que sacar este flag.
-const MODO_PRUEBA = true;
+// 🧪 MODO_PRUEBA: ya cumplió su función (circuito probado y aprobado por Juan
+// y Walter). Se pasa a false para que todo lo que se registre desde ahora
+// (cobros, recibos, numeración) vaya a los datos REALES del consorcio.
+const MODO_PRUEBA = false;
 if(MODO_PRUEBA){
   const _b = document.getElementById('banner-prueba');
   if(_b) _b.style.display = 'block';
@@ -2304,11 +2302,12 @@ function _codigoAleatorio(n){
 // digital en el mismo instante (caso muy poco probable) — para uso normal,
 // con el contador ya creado, sí queda protegido con transacción.
 // Numeración correlativa de recibos digitales.
-// Confirmado con la Administración: el talonario físico llega hasta el 500,
-// así que el PRIMER recibo digital es el 501. Se arranca el contador en 500
-// y cada recibo toma el siguiente número dentro de una transacción, para que
-// dos personas emitiendo a la vez no puedan repetir número.
-const ULTIMO_RECIBO_PAPEL = 500;
+// Confirmado con la Administración: el talonario físico llegó hasta el 501
+// (usado el 14/07/2026), así que el PRIMER recibo digital es el 502. Se
+// arranca el contador en 501 y cada recibo toma el siguiente número dentro
+// de una transacción, para que dos personas emitiendo a la vez no puedan
+// repetir número.
+const ULTIMO_RECIBO_PAPEL = 501;
 
 async function obtenerProximoReciboDigital(){
   const contadorRef = doc(db, '_contadores', MODO_PRUEBA ? 'recibos_prueba' : 'recibos');
