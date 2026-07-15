@@ -2468,16 +2468,24 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.setFontSize(8); docPDF.setTextColor(140,140,140);
   docPDF.text('Conceptos', 10, y);
   y += 4;
-  docPDF.setFontSize(8);
   // Si el propietario adeuda muchos períodos, compacta el interlineado para que
-  // el pie (firmas + leyenda legal) no se caiga de la hoja A5.
-  const pasoConcepto = conceptos.length > 6 ? 4 : 5;
+  // el pie (firmas + leyenda legal) no se caiga de la hoja A5. Cuando un concepto
+  // tiene interés, se agrega una segunda línea chica con el desglose Cap/Int.
+  const compacto = conceptos.length > 4;
+  const pasoLinea = compacto ? 3.8 : 5;
+  const pasoIntLinea = compacto ? 3 : 3.5;
   conceptos.forEach(c=>{
+    docPDF.setFontSize(compacto?7:8);
     docPDF.setTextColor(60,60,60);
     docPDF.text(c.label, 10, y);
     docPDF.setTextColor(30,30,30);
     docPDF.text(`$${Math.round(c.subtotal).toLocaleString('es-AR')}`, W-10, y, {align:'right'});
-    y += pasoConcepto;
+    y += pasoLinea;
+    if(c.int>0){
+      docPDF.setFontSize(compacto?5.5:6.5); docPDF.setTextColor(150,150,150);
+      docPDF.text(`Cap: $${Math.round(c.cap).toLocaleString('es-AR')}  ·  Int: $${Math.round(c.int).toLocaleString('es-AR')}`, 10, y);
+      y += pasoIntLinea;
+    }
     docPDF.setDrawColor(240,240,240);
     docPDF.line(10, y-1.5, W-10, y-1.5);
   });
