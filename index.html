@@ -2324,6 +2324,14 @@ async function obtenerProximoReciboDigital(){
 // se tipeó/editó en el formulario. Capital e interés van en LÍNEAS SEPARADAS
 // (ej: "Abr ord · Exp. Ordinaria" y "Abr ord · Interés Ordinaria"), igual que
 // en un recibo de expensas tradicional — no un subtotal combinado.
+// Mapeo período -> "Mes Año" completo (para el recibo digital; las etiquetas
+// cortas de PERIOD_LABELS, tipo "Abr ord", se siguen usando en el resto del
+// formulario donde el espacio es chico).
+const PERIOD_MES_ANIO = {
+  oe:'Enero 2026', ob:'Febrero 2026', or:'Marzo 2026', oa:'Abril 2026', oy:'Mayo 2026', ju_ord:'Junio 2026', jul_ord:'Julio 2026',
+  xr:'Marzo 2026', xa:'Abril 2026', xy:'Mayo 2026', ju_ext:'Junio 2026', jul_ext:'Julio 2026'
+};
+
 function _conceptosDesdeForm(cobro, capitalPer, interesPer){
   const claves = [...new Set([...Object.keys(capitalPer), ...Object.keys(interesPer)])];
   const tipoLabel = tipoL(cobro.conc);
@@ -2339,8 +2347,9 @@ function _conceptosDesdeForm(cobro, capitalPer, interesPer){
     // general del cobro — así en un recibo combinado (ambas) cada renglón se
     // etiqueta bien como Ordinaria o Extraordinaria según corresponda.
     let labelCap, labelInt;
-    if(esOrd(k)){ labelCap = `${PERIOD_LABELS[k]} · Exp. Ordinaria`; labelInt = `${PERIOD_LABELS[k]} · Interés Ordinaria`; }
-    else if(esExt(k)){ labelCap = `${PERIOD_LABELS[k]} · Exp. Extraordinaria`; labelInt = `${PERIOD_LABELS[k]} · Interés Extraordinaria`; }
+    const mesAnio = PERIOD_MES_ANIO[k] || PERIOD_LABELS[k];
+    if(esOrd(k)){ labelCap = `${mesAnio} · Exp. Ordinaria`; labelInt = `${mesAnio} · Interés Ordinaria`; }
+    else if(esExt(k)){ labelCap = `${mesAnio} · Exp. Extraordinaria`; labelInt = `${mesAnio} · Interés Extraordinaria`; }
     else { labelCap = tipoLabel; labelInt = `${tipoLabel} · Interés`; }
     if(cap) lineas.push({label:labelCap, cap, int:0, subtotal:cap});
     if(int) lineas.push({label:labelInt, cap:0, int, subtotal:int});
