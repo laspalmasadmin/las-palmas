@@ -2549,10 +2549,12 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.text('Este comprobante es una copia informativa. El registro', 33, y+13);
   docPDF.text('oficial obra en los sistemas del Consorcio.', 33, y+16);
 
-  y += 26;
+  const firmaData = meta.firmanteId && FIRMAS_ADMIN[meta.firmanteId];
+  // Si hay firma real, la línea necesita más aire arriba (para la imagen)
+  // y así no pisa el QR/leyenda de verificación de más arriba.
+  y += (firmaData && firmaData.img) ? 40 : 26;
   docPDF.setDrawColor(150,150,150);
   docPDF.line(14, y, 60, y);
-  const firmaData = meta.firmanteId && FIRMAS_ADMIN[meta.firmanteId];
   if(firmaData && firmaData.img){
     // Firma escaneada real, apoyada justo arriba del renglón (proporción
     // real de la imagen, no estirada, para que no se vea deformada).
