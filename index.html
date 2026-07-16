@@ -400,6 +400,13 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
   </div>
   <div id="rc"><div class="empty">Seleccioná un lote</div></div>
+
+  <div class="card">
+    <div class="ct">🚫 Anular recibo digital</div>
+    <div class="fg"><label>Número de recibo</label><input type="number" id="an-numero" placeholder="ej: 507"></div>
+    <button class="btn" onclick="buscarReciboParaAnular()">🔍 Buscar</button>
+    <div id="an-resultado"></div>
+  </div>
 </div>
 
 <!-- ACTIVIDAD -->
@@ -2674,6 +2681,67 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) =>
   }
 };
 
+// ══════════════ ANULACIÓN DE RECIBOS DIGITALES ══════════════
+// Busca un recibo por número y muestra sus datos + botón para anularlo.
+// Anular NO borra el documento (así no se pierde el historial ni se puede
+// reusar el número): solo marca anulado:true con motivo, quién y cuándo.
+// Esa marca se ve tanto acá como en la verificación pública (QR), para que
+// quien reciba el PDF viejo pueda confirmar que ya no es válido.
+window.buscarReciboParaAnular = async () => {
+  const out = document.getElementById('an-resultado');
+  const numero = parseInt(document.getElementById('an-numero').value);
+  if(!numero){ toast('⚠️ Ingresá un número de recibo'); return; }
+  out.innerHTML = `<div class="empty">Buscando...</div>`;
+  try{
+    const q = query(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), where('recibo','==',numero));
+    const snap = await getDocs(q);
+    if(snap.empty){
+      out.innerHTML = `<div class="empty">No se encontró el recibo N.º ${numero}</div>`;
+      return;
+    }
+    const docSnap = snap.docs[0];
+    const r = docSnap.data();
+    if(r.anulado){
+      out.innerHTML = `
+        <div style="background:#ffebee;border:1px solid #ffcdd2;border-radius:8px;padding:10px;margin-top:8px">
+          <div style="font-weight:700;color:#c62828">⚠️ Este recibo ya está ANULADO</div>
+          <div style="font-size:12px;margin-top:4px">${r.lote} — ${r.propietario} — $${Math.round(r.total).toLocaleString('es-AR')}</div>
+          <div style="font-size:11px;color:#888;margin-top:4px">Motivo: ${r.motivoAnulacion||'—'}</div>
+          <div style="font-size:11px;color:#888">Anulado por ${r.anuladoPor||'—'} el ${r.fechaAnulacion?new Date(r.fechaAnulacion).toLocaleString('es-AR'):'—'}</div>
+        </div>`;
+      return;
+    }
+    out.innerHTML = `
+      <div style="border:1px solid #ddd;border-radius:8px;padding:10px;margin-top:8px">
+        <div style="font-weight:700;font-size:13px">Recibo N.º ${r.recibo} — ${r.lote}</div>
+        <div style="font-size:12px;color:#555">${r.propietario} — $${Math.round(r.total).toLocaleString('es-AR')} — ${r.fecha||'—'}</div>
+        <div class="fg" style="margin-top:8px"><label>Motivo de anulación</label><input type="text" id="an-motivo" placeholder="ej: monto mal cargado, se emitió de nuevo"></div>
+        <button class="btn" style="background:#c62828" onclick="confirmarAnularRecibo('${docSnap.id}', ${r.recibo})">🚫 Anular este recibo</button>
+      </div>`;
+  }catch(e){
+    out.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+};
+
+window.confirmarAnularRecibo = async (docId, numero) => {
+  const motivoEl = document.getElementById('an-motivo');
+  const motivo = motivoEl ? motivoEl.value.trim() : '';
+  if(!motivo){ toast('⚠️ Escribí el motivo de la anulación'); return; }
+  if(!confirm(`¿Confirmás anular el recibo N.º ${numero}?\n\nEsta acción queda registrada (con tu nombre y el motivo) y se muestra en la verificación pública del QR.`)) return;
+  try{
+    await setDoc(doc(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS', docId), {
+      anulado: true,
+      motivoAnulacion: motivo,
+      anuladoPor: USER_ACTUAL?USER_ACTUAL.nombre:'',
+      fechaAnulacion: new Date().toISOString()
+    }, {merge:true});
+    toast(`✅ Recibo N.º ${numero} anulado`);
+    buscarReciboParaAnular();
+  }catch(e){
+    toast('❌ Error anulando: '+e.message);
+  }
+};
+
 // ══════════════ VERIFICACIÓN PÚBLICA (sin login) ══════════════
 // Al abrir el link/QR del recibo (#verificar/CODIGO), muestra en solo lectura
 // lo que quedó guardado en Firestore al momento del cobro — así se puede
@@ -2695,6 +2763,10 @@ async function mostrarVerificacionPublica(codigo){
     }
     const r = snap.docs[0].data();
     body.innerHTML = `
+      ${r.anulado ? `<div style="background:#c62828;color:white;text-align:center;padding:10px;border-radius:8px;margin-bottom:12px">
+        <div style="font-size:16px;font-weight:700">⚠️ RECIBO ANULADO</div>
+        <div style="font-size:11px;margin-top:4px">Este comprobante ya no es válido${r.motivoAnulacion?': '+r.motivoAnulacion:''}</div>
+      </div>` : ''}
       <div style="text-align:center;margin-bottom:10px">
         <div style="font-size:11px;color:#888">Recibo</div>
         <div style="font-size:20px;font-weight:700;color:#1a7a4a">N.º ${String(r.recibo).padStart(4,'0')}</div>
