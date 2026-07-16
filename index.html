@@ -1090,7 +1090,7 @@ window.registrar = async () => {
       comprobanteImg: window._comprobanteDataURL||'',
       obs: document.getElementById('iob').value||''
     };
-    await addDoc(collection(db, colC()), cobro);
+    const cobroRef = await addDoc(collection(db, colC()), cobro);
 
     // renderDeu cruza con COBROS en tiempo real, no hace falta modificar DEU[]
     const loteInfo = LB.find(x=>x.n===n);
@@ -1098,7 +1098,7 @@ window.registrar = async () => {
     toast(`✅ Cobro registrado · ${loteInfo?loteInfo.l:''}`);
     registrarActividad(`Registró cobro: ${loteInfo?loteInfo.l+' - '+loteInfo.p:''} · ${fa(monto)}${interes?` (Cap ${fa(capitalTot)} + Int ${fa(interes)}: ${detInt})`:''} · ${cobro.conc} · ${per}`);
     if(document.getElementById('chk-recibo-digital').checked){
-      await window.generarReciboDigital(cobro, loteInfo, capitalPer, interesPer);
+      await window.generarReciboDigital(cobro, loteInfo, capitalPer, interesPer, cobroRef.id, colC());
     }
     ['iob','ilemon'].forEach(id=>document.getElementById(id).value='');
     window.quitarComprobante();
@@ -2639,7 +2639,7 @@ async function compartirReciboWhatsapp(pdfDoc, filename, resumenTexto){
 // Punto de entrada: crea el doc en RECIBOS, arma el PDF, y muestra la vista
 // previa con el botón de compartir — se llama automáticamente desde registrar()
 // solo si el checkbox "Generar recibo digital" está tildado.
-window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) => {
+window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, cobroId, cobroColeccion) => {
   try{
     const out = document.getElementById('recibo-digital-out');
     out.innerHTML = `<div class="empty">Generando recibo...</div>`;
@@ -2652,7 +2652,8 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer) =>
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
       conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
       lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA,
-      urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString()
+      urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
+      cobroId:cobroId||'', cobroColeccion:cobroColeccion||''
     };
     await addDoc(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), reciboDoc);
 
@@ -2708,34 +2709,54 @@ window.buscarReciboParaAnular = async () => {
           <div style="font-size:12px;margin-top:4px">${r.lote} — ${r.propietario} — $${Math.round(r.total).toLocaleString('es-AR')}</div>
           <div style="font-size:11px;color:#888;margin-top:4px">Motivo: ${r.motivoAnulacion||'—'}</div>
           <div style="font-size:11px;color:#888">Anulado por ${r.anuladoPor||'—'} el ${r.fechaAnulacion?new Date(r.fechaAnulacion).toLocaleString('es-AR'):'—'}</div>
+          ${r.deudaRevertida ? `<div style="font-size:11px;color:#2e7d32;margin-top:4px">✅ La deuda fue revertida (se eliminó el cobro asociado)</div>` : ''}
         </div>`;
       return;
     }
+    const tieneCobroVinculado = !!(r.cobroId && r.cobroColeccion);
     out.innerHTML = `
       <div style="border:1px solid #ddd;border-radius:8px;padding:10px;margin-top:8px">
         <div style="font-weight:700;font-size:13px">Recibo N.º ${r.recibo} — ${r.lote}</div>
         <div style="font-size:12px;color:#555">${r.propietario} — $${Math.round(r.total).toLocaleString('es-AR')} — ${r.fecha||'—'}</div>
         <div class="fg" style="margin-top:8px"><label>Motivo de anulación</label><input type="text" id="an-motivo" placeholder="ej: monto mal cargado, se emitió de nuevo"></div>
-        <button class="btn" style="background:#c62828" onclick="confirmarAnularRecibo('${docSnap.id}', ${r.recibo})">🚫 Anular este recibo</button>
+        ${tieneCobroVinculado ? `
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;cursor:pointer">
+            <input type="checkbox" id="an-revertir-deuda">
+            También revertir la deuda (elimina el cobro registrado — la deuda del lote vuelve a estar como antes de este cobro)
+          </label>` : `
+          <div style="font-size:11px;color:#c62828;background:#fff3e0;border-radius:6px;padding:6px 8px;margin-top:8px">
+            ⚠️ Este recibo se generó antes de esta función y no tiene el cobro vinculado. Si anulás acá, <b>la deuda NO se revierte sola</b>. Tenés que borrar o corregir el cobro correspondiente a mano en la pestaña "Cobros".
+          </div>`}
+        <button class="btn" style="background:#c62828;margin-top:8px" onclick="confirmarAnularRecibo('${docSnap.id}', ${r.recibo}, ${tieneCobroVinculado ? `'${r.cobroId}'` : 'null'}, ${tieneCobroVinculado ? `'${r.cobroColeccion}'` : 'null'})">🚫 Anular este recibo</button>
       </div>`;
   }catch(e){
     out.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
   }
 };
 
-window.confirmarAnularRecibo = async (docId, numero) => {
+window.confirmarAnularRecibo = async (docId, numero, cobroId, cobroColeccion) => {
   const motivoEl = document.getElementById('an-motivo');
   const motivo = motivoEl ? motivoEl.value.trim() : '';
   if(!motivo){ toast('⚠️ Escribí el motivo de la anulación'); return; }
-  if(!confirm(`¿Confirmás anular el recibo N.º ${numero}?\n\nEsta acción queda registrada (con tu nombre y el motivo) y se muestra en la verificación pública del QR.`)) return;
+  const chkRevertir = document.getElementById('an-revertir-deuda');
+  const revertirDeuda = !!(chkRevertir && chkRevertir.checked && cobroId && cobroColeccion);
+  const msgConfirm = revertirDeuda
+    ? `¿Confirmás anular el recibo N.º ${numero} Y revertir la deuda (se elimina el cobro asociado)?\n\nEsta acción no se puede deshacer.`
+    : `¿Confirmás anular el recibo N.º ${numero}?\n\nEsta acción queda registrada (con tu nombre y el motivo) y se muestra en la verificación pública del QR. La deuda del lote NO se modifica.`;
+  if(!confirm(msgConfirm)) return;
   try{
+    if(revertirDeuda){
+      await deleteDoc(doc(db, cobroColeccion, cobroId));
+    }
     await setDoc(doc(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS', docId), {
       anulado: true,
       motivoAnulacion: motivo,
       anuladoPor: USER_ACTUAL?USER_ACTUAL.nombre:'',
-      fechaAnulacion: new Date().toISOString()
+      fechaAnulacion: new Date().toISOString(),
+      deudaRevertida: revertirDeuda
     }, {merge:true});
-    toast(`✅ Recibo N.º ${numero} anulado`);
+    registrarActividad(`Anuló recibo N.º ${numero}${revertirDeuda?' y revirtió la deuda (cobro eliminado)':''} · Motivo: ${motivo}`);
+    toast(`✅ Recibo N.º ${numero} anulado${revertirDeuda?' y deuda revertida':''}`);
     buscarReciboParaAnular();
   }catch(e){
     toast('❌ Error anulando: '+e.message);
