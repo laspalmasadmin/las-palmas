@@ -2619,7 +2619,58 @@ function imprimirPDF(pdfDoc){
   };
 }
 
-// Comparte el PDF por WhatsApp usando el selector nativo del teléfono
+// ══════════════ WHATSAPP VINCULADO POR LOTE ══════════════
+// Guarda el número de WhatsApp del propietario una sola vez por lote
+// (colección CONTACTOS, doc id = nombre del lote). Con eso, de ahí en más
+// el botón "Enviar por WhatsApp" abre directo el chat de esa persona,
+// sin tener que buscarla cada vez.
+function colContactos(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'CONTACTOS'; }
+
+async function obtenerTelefonoLote(lote){
+  try{
+    const snap = await getDoc(doc(db, colContactos(), lote.replace(/\s+/g,'_')));
+    return snap.exists() ? snap.data().tel : '';
+  }catch(e){ return ''; }
+}
+
+window.guardarTelefonoLote = async (lote, propietario, telInputId, numero, fecha, monto) => {
+  const input = document.getElementById(telInputId);
+  const tel = input.value.replace(/\D/g,'');
+  if(tel.length < 10){ toast('⚠️ Ingresá un WhatsApp completo con código de país (ej: 5493815551234)'); return; }
+  try{
+    await setDoc(doc(db, colContactos(), lote.replace(/\s+/g,'_')), {lote, propietario, tel}, {merge:true});
+    toast('✅ WhatsApp guardado para '+propietario);
+    enviarReciboWhatsappDirecto(tel, numero, fecha, monto, propietario);
+  }catch(e){ toast('❌ Error guardando: '+e.message); }
+};
+
+// Abre el chat de WhatsApp de esa persona con el mensaje ya escrito, y
+// comparte/descarga el PDF para adjuntarlo en el mismo chat. WhatsApp no
+// permite hacer las dos cosas en un solo paso desde una web, así que son
+// dos acciones (compartir archivo + abrir chat), pero ambas quedan a mano.
+window.enviarReciboWhatsappDirecto = async (tel, numero, fecha, monto, propietario) => {
+  const telLimpio = String(tel).replace(/\D/g,'');
+  const msg = `Hola ${propietario}! Te envío el recibo de lo cobrado con fecha ${fecha} por $${Math.round(monto).toLocaleString('es-AR')}.`;
+  const pdfDoc = window['_pdfPendiente_'+numero];
+  let compartioArchivo = false;
+  if(pdfDoc){
+    const filename = `Recibo_${numero}.pdf`;
+    const blob = pdfDoc.output('blob');
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:msg});
+        compartioArchivo = true;
+      }catch(e){ /* canceló o falló: seguimos igual */ }
+    } else {
+      pdfDoc.save(filename);
+    }
+  }
+  const textoWa = compartioArchivo ? msg : msg + '\n(Adjuntá el PDF que se acaba de descargar/compartir)';
+  window.open(`https://wa.me/${telLimpio}?text=${encodeURIComponent(textoWa)}`, '_blank');
+};
+
+
 // (Web Share API con archivo). Si el navegador no lo soporta (ej. desktop
 // sin esa API), baja el PDF y abre WhatsApp Web con un texto para adjuntarlo a mano.
 async function compartirReciboWhatsapp(pdfDoc, filename, resumenTexto){
@@ -2664,6 +2715,21 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const filename = `Recibo_${numero}_${(loteInfo?loteInfo.p:'').replace(/\s+/g,'_')}.pdf`;
     const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
     const resumenTexto = `Recibo N.º ${numero} — ${loteInfo?loteInfo.l:''} — ${loteInfo?loteInfo.p:''} — Total: $${Math.round(cobro.monto).toLocaleString('es-AR')}`;
+    window['_pdfPendiente_'+numero] = pdfDoc;
+    const telGuardado = loteInfo ? await obtenerTelefonoLote(loteInfo.l) : '';
+    const propietarioSafe = (loteInfo?loteInfo.p:'').replace(/'/g,"\\'");
+    const fechaSafe = (cobro.fecha||'').replace(/'/g,"\\'");
+    const bloqueWhatsapp = telGuardado ? `
+        <button type="button" class="btn-sm" style="width:100%;margin-top:8px;background:#25d366;color:#fff;border:none" onclick='enviarReciboWhatsappDirecto("${telGuardado}", ${numero}, "${fechaSafe}", ${cobro.monto}, "${propietarioSafe}")'>📱 Enviar a ${loteInfo.p} (+${telGuardado})</button>
+        <div style="text-align:center;margin-top:4px"><a href="#" style="font-size:11px;color:#888" onclick="document.getElementById('wa-edit-${numero}').style.display='flex';return false">✏️ cambiar número</a></div>
+        <div id="wa-edit-${numero}" style="display:none;gap:6px;margin-top:6px">
+          <input type="text" id="wa-tel-${numero}" placeholder="ej: 5493815551234" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+          <button type="button" class="btn-sm" onclick='guardarTelefonoLote("${loteInfo.l}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto})'>💾</button>
+        </div>` : `
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="wa-tel-${numero}" placeholder="WhatsApp del propietario (ej: 5493815551234)" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+          <button type="button" class="btn-sm" style="background:#25d366;color:#fff;border:none" onclick='guardarTelefonoLote("${loteInfo?loteInfo.l:''}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto})'>📱 Guardar y enviar</button>
+        </div>`;
 
     out.innerHTML = `
       <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px;margin-top:8px">
@@ -2672,10 +2738,10 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
         <div style="display:flex;gap:8px;margin-top:8px">
           <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
           <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick='imprimirPDF(window._pdfPendiente_${numero})'>🖨️ Imprimir</button>
-          <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfPendiente_${numero}, "${filename}", ${JSON.stringify(resumenTexto)})'>📱 WhatsApp</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfPendiente_${numero}, "${filename}", ${JSON.stringify(resumenTexto)})'>📱 WhatsApp (genérico)</button>
         </div>
+        ${bloqueWhatsapp}
       </div>`;
-    window['_pdfPendiente_'+numero] = pdfDoc;
   }catch(e){
     console.error(e);
     toast('❌ Error generando recibo digital: '+e.message);
