@@ -2568,27 +2568,29 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   const firmaData = meta.firmanteId && FIRMAS_ADMIN[meta.firmanteId];
   // Si hay firma real, la línea necesita más aire arriba (para la imagen)
   // y así no pisa el QR/leyenda de verificación de más arriba.
-  y += (firmaData && firmaData.img) ? 40 : 26;
+  y += (firmaData && firmaData.img) ? 46 : 26;
   docPDF.setDrawColor(150,150,150);
-  docPDF.line(14, y, 60, y);
+  docPDF.line(14, y, 65, y);
   if(firmaData && firmaData.img){
     // Firma escaneada real, apoyada justo arriba del renglón (proporción
     // real de la imagen, no estirada, para que no se vea deformada).
+    // Tamaño más grande para que la firma y el sello tengan más presencia.
     try{
-      const altoFirma = 15, anchoFirma = altoFirma * (500/387);
+      const altoFirma = 20, anchoFirma = altoFirma * (500/387);
       docPDF.addImage(firmaData.img, 'PNG', 16, y-altoFirma-1, anchoFirma, altoFirma);
     }catch(e){ /* si falla la imagen, el recibo sigue con línea + nombre */ }
   }
-  docPDF.setFontSize(8); docPDF.setTextColor(30,30,30);
-  docPDF.text((firmaData && firmaData.nombre) || meta.firmante || 'Juan Ponce / Walter Vallejo', 14, y+4);
-  docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
-  docPDF.text('Administrador', 14, y+8);
+  docPDF.setFontSize(9.5); docPDF.setFont(undefined,'bold'); docPDF.setTextColor(20,20,20);
+  docPDF.text((firmaData && firmaData.nombre) || meta.firmante || 'Juan Ponce / Walter Vallejo', 14, y+5);
+  docPDF.setFont(undefined,'normal');
+  docPDF.setFontSize(7.5); docPDF.setTextColor(110,110,110);
+  docPDF.text('Administrador', 14, y+9);
 
   // Leyenda legal al pie.
   // La reserva de intereses NO es decorativa: el art. 899 inc. c) del CCCN
   // presume que si se da recibo por el capital SIN reservar los intereses,
   // los intereses quedan extinguidos. Esta cláusula evita esa pérdida.
-  y += 13;
+  y += 14;
   docPDF.setDrawColor(225,225,225);
   docPDF.line(10, y, W-10, y);
   y += 4;
@@ -2633,14 +2635,14 @@ async function obtenerTelefonoLote(lote){
   }catch(e){ return ''; }
 }
 
-window.guardarTelefonoLote = async (lote, propietario, telInputId, numero, fecha, monto) => {
+window.guardarTelefonoLote = async (lote, propietario, telInputId, numero, fecha, monto, nombreFirmante) => {
   const input = document.getElementById(telInputId);
   const tel = input.value.replace(/\D/g,'');
   if(tel.length < 10){ toast('⚠️ Ingresá un WhatsApp completo con código de país (ej: 5493815551234)'); return; }
   try{
     await setDoc(doc(db, colContactos(), lote.replace(/\s+/g,'_')), {lote, propietario, tel}, {merge:true});
     toast('✅ WhatsApp guardado para '+propietario);
-    enviarReciboWhatsappDirecto(tel, numero, fecha, monto, propietario);
+    enviarReciboWhatsappDirecto(tel, numero, fecha, monto, propietario, nombreFirmante);
   }catch(e){ toast('❌ Error guardando: '+e.message); }
 };
 
@@ -2648,9 +2650,12 @@ window.guardarTelefonoLote = async (lote, propietario, telInputId, numero, fecha
 // comparte/descarga el PDF para adjuntarlo en el mismo chat. WhatsApp no
 // permite hacer las dos cosas en un solo paso desde una web, así que son
 // dos acciones (compartir archivo + abrir chat), pero ambas quedan a mano.
-window.enviarReciboWhatsappDirecto = async (tel, numero, fecha, monto, propietario) => {
+// El mensaje cierra con el nombre del administrador firmante, para que
+// quede clara su gestión frente al propietario.
+window.enviarReciboWhatsappDirecto = async (tel, numero, fecha, monto, propietario, nombreFirmante) => {
   const telLimpio = String(tel).replace(/\D/g,'');
-  const msg = `Hola ${propietario}! Te envío el recibo de lo cobrado con fecha ${fecha} por $${Math.round(monto).toLocaleString('es-AR')}.`;
+  const firma = nombreFirmante ? `\n\n${nombreFirmante}\nAdministrador · Consorcio Barrio Las Palmas` : '';
+  const msg = `Hola ${propietario}! Te envío el recibo de lo cobrado con fecha ${fecha} por $${Math.round(monto).toLocaleString('es-AR')}.${firma}`;
   const pdfDoc = window['_pdfPendiente_'+numero];
   let compartioArchivo = false;
   if(pdfDoc){
@@ -2719,16 +2724,18 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const telGuardado = loteInfo ? await obtenerTelefonoLote(loteInfo.l) : '';
     const propietarioSafe = (loteInfo?loteInfo.p:'').replace(/'/g,"\\'");
     const fechaSafe = (cobro.fecha||'').replace(/'/g,"\\'");
+    const nombreFirmante = (firmanteId && FIRMAS_ADMIN[firmanteId] && FIRMAS_ADMIN[firmanteId].nombre) || meta.firmante || '';
+    const nombreFirmanteSafe = nombreFirmante.replace(/'/g,"\\'");
     const bloqueWhatsapp = telGuardado ? `
-        <button type="button" class="btn-sm" style="width:100%;margin-top:8px;background:#25d366;color:#fff;border:none" onclick='enviarReciboWhatsappDirecto("${telGuardado}", ${numero}, "${fechaSafe}", ${cobro.monto}, "${propietarioSafe}")'>📱 Enviar a ${loteInfo.p} (+${telGuardado})</button>
+        <button type="button" class="btn-sm" style="width:100%;margin-top:8px;background:#25d366;color:#fff;border:none" onclick='enviarReciboWhatsappDirecto("${telGuardado}", ${numero}, "${fechaSafe}", ${cobro.monto}, "${propietarioSafe}", "${nombreFirmanteSafe}")'>📱 Enviar a ${loteInfo.p} (+${telGuardado})</button>
         <div style="text-align:center;margin-top:4px"><a href="#" style="font-size:11px;color:#888" onclick="document.getElementById('wa-edit-${numero}').style.display='flex';return false">✏️ cambiar número</a></div>
         <div id="wa-edit-${numero}" style="display:none;gap:6px;margin-top:6px">
           <input type="text" id="wa-tel-${numero}" placeholder="ej: 5493815551234" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
-          <button type="button" class="btn-sm" onclick='guardarTelefonoLote("${loteInfo.l}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto})'>💾</button>
+          <button type="button" class="btn-sm" onclick='guardarTelefonoLote("${loteInfo.l}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto}, "${nombreFirmanteSafe}")'>💾</button>
         </div>` : `
         <div style="display:flex;gap:6px;margin-top:8px">
           <input type="text" id="wa-tel-${numero}" placeholder="WhatsApp del propietario (ej: 5493815551234)" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px">
-          <button type="button" class="btn-sm" style="background:#25d366;color:#fff;border:none" onclick='guardarTelefonoLote("${loteInfo?loteInfo.l:''}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto})'>📱 Guardar y enviar</button>
+          <button type="button" class="btn-sm" style="background:#25d366;color:#fff;border:none" onclick='guardarTelefonoLote("${loteInfo?loteInfo.l:''}", "${propietarioSafe}", "wa-tel-${numero}", ${numero}, "${fechaSafe}", ${cobro.monto}, "${nombreFirmanteSafe}")'>📱 Guardar y enviar</button>
         </div>`;
 
     out.innerHTML = `
