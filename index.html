@@ -357,6 +357,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
     <div class="g2">
       <div class="met"><div class="ml">Planes vigentes</div><div class="mv vd" id="plan-cnt-vig">—</div></div>
+      <div class="met"><div class="ml">En riesgo</div><div class="mv nj" id="plan-cnt-riesgo">—</div></div>
       <div class="met"><div class="ml">Caídos</div><div class="mv rj" id="plan-cnt-caidos">—</div></div>
     </div>
     <div id="lista-planes"></div>
@@ -3667,10 +3668,8 @@ async function cargarPlanes(){
         cambio = true;
       }
     });
-    if(plan.cuotas.some(c=>c.estado==='vencida') && !plan.caido){
-      plan.caido = true;
-      cambio = true;
-    }
+    // La caducidad del plan (cláusula QUINTA) NO se aplica sola: solo se
+    // avisa. El administrador tiene que confirmarla a mano desde el detalle.
     if(cambio){
       await setDoc(doc(db, colPlanes(), plan.id), plan);
     }
@@ -3682,7 +3681,9 @@ async function cargarPlanes(){
 function renderPlanes(){
   const vigentes = PLANES.filter(p=>!p.caido).length;
   const caidos = PLANES.filter(p=>p.caido).length;
+  const enRiesgo = PLANES.filter(p=>!p.caido && p.cuotas.some(c=>c.estado==='vencida')).length;
   document.getElementById('plan-cnt-vig').textContent = vigentes;
+  document.getElementById('plan-cnt-riesgo').textContent = enRiesgo;
   document.getElementById('plan-cnt-caidos').textContent = caidos;
 
   if(!PLANES.length){
@@ -3691,13 +3692,18 @@ function renderPlanes(){
   }
   document.getElementById('lista-planes').innerHTML = PLANES.map(p=>{
     const pagadas = p.cuotas.filter(c=>c.estado==='pagada').length;
-    return `<div class="lc ${p.caido?'pen':'pag'}" style="cursor:pointer" onclick="abrirDetallePlan('${p.id}')">
+    const riesgo = !p.caido && p.cuotas.some(c=>c.estado==='vencida');
+    const estado = p.caido ? 'pen' : (riesgo ? 'pen' : 'pag');
+    const badgeTxt = p.caido ? 'Plan caído' : (riesgo ? 'Cuota vencida — confirmar' : 'Al día');
+    const badgeBg = p.caido ? '#fdecea' : (riesgo ? '#fff8e1' : '#e8f5e9');
+    const badgeCol = p.caido ? '#c62828' : (riesgo ? '#f57c00' : '#1a7a4a');
+    return `<div class="lc ${estado}" style="cursor:pointer" onclick="abrirDetallePlan('${p.id}')">
       <div class="lc-top">
         <div class="lc-left">
           <div class="lc-name">${p.lote} — ${p.propietario}</div>
           <div class="lc-sub"><span>Opción ${p.opcion}</span><span>${pagadas}/18 cuotas pagadas</span></div>
         </div>
-        <span style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap;background:${p.caido?'#fdecea':'#e8f5e9'};color:${p.caido?'#c62828':'#1a7a4a'}">${p.caido?'Plan caído':'Al día'}</span>
+        <span style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap;background:${badgeBg};color:${badgeCol}">${badgeTxt}</span>
       </div>
     </div>`;
   }).join('');
@@ -3721,15 +3727,23 @@ function renderDetallePlan(){
   if(!p) return;
   document.getElementById('pd-nombre').textContent = p.lote + ' — ' + p.propietario;
   document.getElementById('pd-sub').textContent = 'Opción '+p.opcion+' · 18 cuotas · desde '+p.cuotas[0].periodo;
+  const riesgo = !p.caido && p.cuotas.some(c=>c.estado==='vencida');
   const badge = document.getElementById('pd-badge');
-  badge.textContent = p.caido ? 'Plan caído' : 'Al día';
-  badge.style.background = p.caido ? '#fdecea' : '#e8f5e9';
-  badge.style.color = p.caido ? '#c62828' : '#1a7a4a';
+  badge.textContent = p.caido ? 'Plan caído' : (riesgo ? 'Cuota vencida' : 'Al día');
+  badge.style.background = p.caido ? '#fdecea' : (riesgo ? '#fff8e1' : '#e8f5e9');
+  badge.style.color = p.caido ? '#c62828' : (riesgo ? '#f57c00' : '#1a7a4a');
 
   const alerta = document.getElementById('pd-alerta');
-  alerta.innerHTML = p.caido
-    ? `<div style="background:#fdecea;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #e53935">⚠️ Plan caído por cuota impaga al vencimiento (cláusula QUINTA). El lote vuelve a deuda extraordinaria general + 4% de interés punitorio mensual.</div>`
-    : '';
+  if(p.caido){
+    alerta.innerHTML = `<div style="background:#fdecea;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #e53935">⚠️ Plan caído por cuota impaga al vencimiento (cláusula QUINTA). El lote vuelve a deuda extraordinaria general + 4% de interés punitorio mensual.</div>`;
+  } else if(riesgo){
+    alerta.innerHTML = `<div style="background:#fff8e1;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #f9a825">
+      ⚠️ Hay una cuota vencida sin pagar. Según la cláusula QUINTA, esto habilita la caducidad del plan — pero no se aplica sola.
+      <button class="btn rj" style="margin-top:8px" onclick="confirmarCaducidad('${p.id}')">Confirmar caducidad del plan</button>
+    </div>`;
+  } else {
+    alerta.innerHTML = '';
+  }
 
   document.getElementById('pd-cuotas').innerHTML = p.cuotas.map(c=>{
     const colores = {pagada:'#1a7a4a', vencida:'#e53935', pendiente:'#888'};
@@ -3746,6 +3760,21 @@ function renderDetallePlan(){
     </tr>`;
   }).join('');
 }
+
+// La caducidad NUNCA se aplica sola: la cuota vencida solo dispara el aviso.
+// Recién acá, con confirmación explícita del administrador, el plan pasa a
+// caído y el lote vuelve a deuda extraordinaria general + 4% punitorio.
+window.confirmarCaducidad = async (planId) => {
+  const p = PLANES.find(x=>x.id===planId);
+  if(!p) return;
+  if(!confirm(`¿Confirmás la caducidad del plan de ${p.lote} (${p.propietario})?\n\nEl lote va a volver a figurar con la deuda extraordinaria general + 4% de interés punitorio mensual, según la cláusula QUINTA.`)) return;
+  p.caido = true;
+  p.fechaCaida = new Date().toISOString().slice(0,10);
+  await setDoc(doc(db, colPlanes(), p.id), p);
+  toast(`⚠️ Plan caído confirmado · ${p.lote}`);
+  registrarActividad(`Confirmó la caducidad del plan de pagos de ${p.lote} (${p.propietario}) por cuota impaga`);
+  renderDetallePlan();
+};
 
 // Registrar el cobro de una cuota: marca la cuota como pagada en el plan Y
 // además, si el mes de esa cuota coincide con el mes seleccionado en la app,
