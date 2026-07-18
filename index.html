@@ -152,6 +152,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" onclick="ST('rend',this)">📋 Informe mensual</button>
   <button class="tab" onclick="ST('egr',this)">📤 Gastos</button>
   <button class="tab" onclick="ST('deu',this)">⚠️ Deudores</button>
+  <button class="tab" onclick="ST('plan',this)">📑 Planes de pago</button>
   <button class="tab" onclick="ST('int',this)">📐 Calcular intereses</button>
   <button class="tab" onclick="ST('est',this)">📊 Resumen financiero</button>
   <button class="tab" onclick="ST('rec',this)">🧾 Ver recibos</button>
@@ -346,6 +347,59 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 
   <div id="lista-deu"></div>
+</div>
+
+<!-- PLANES DE PAGO -->
+<div id="pnl-plan" class="pnl">
+  <div id="plan-lista-view">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn az" onclick="abrirNuevoPlan()" style="width:auto;padding:8px 16px">➕ Nuevo plan</button>
+    </div>
+    <div class="g2">
+      <div class="met"><div class="ml">Planes vigentes</div><div class="mv vd" id="plan-cnt-vig">—</div></div>
+      <div class="met"><div class="ml">Caídos</div><div class="mv rj" id="plan-cnt-caidos">—</div></div>
+    </div>
+    <div id="lista-planes"></div>
+  </div>
+
+  <div id="plan-detalle-view" style="display:none">
+    <button class="btn-sm" onclick="cerrarDetallePlan()" style="margin-bottom:10px">← Volver</button>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="ct" id="pd-nombre" style="margin-bottom:2px"></div>
+          <div style="font-size:11px;color:#888" id="pd-sub"></div>
+        </div>
+        <span id="pd-badge" style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap"></span>
+      </div>
+      <div id="pd-alerta"></div>
+      <div class="tbl" style="margin-top:10px">
+        <table>
+          <thead><tr><th>Cuota</th><th>Período</th><th class="num">Importe</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="pd-cuotas"></tbody>
+        </table>
+      </div>
+      <button class="btn-sm btn-dl" onclick="borrarPlan()" style="margin-top:10px">🗑️ Eliminar plan</button>
+    </div>
+  </div>
+
+  <!-- Modal nuevo plan -->
+  <div id="modal-nuevo-plan" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto">
+    <div style="background:#fff;border-radius:12px;padding:16px;margin:30px auto;max-width:420px">
+      <div class="ct">📑 Nuevo plan de pago</div>
+      <div class="fg"><label>Lote</label><select id="np-lote"></select></div>
+      <div class="fg"><label>Opción</label>
+        <select id="np-opcion" onchange="previsualizarCuotas()">
+          <option value="1">Opción 1 — 18 cuotas fijas de $72.739</option>
+          <option value="2">Opción 2 — 18 cuotas crecientes desde $46.540 (+5%/mes)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Mes de la primera cuota</label><input type="month" id="np-mes-inicio" onchange="previsualizarCuotas()"></div>
+      <div id="np-preview" style="font-size:11px;color:#888;margin-bottom:8px"></div>
+      <button class="btn" onclick="guardarNuevoPlan()">Guardar plan</button>
+      <button class="btn gr" onclick="document.getElementById('modal-nuevo-plan').style.display='none'">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- INTERESES -->
@@ -780,6 +834,7 @@ window.ST = (n,el)=>{
   if(n==='rec') poblarRS();
   if(n==='rend') renderRend();
   if(n==='conc') renderConc();
+  if(n==='plan') cargarPlanes();
 };
 
 window.cerrar = id => document.getElementById(id).style.display='none';
@@ -3529,6 +3584,195 @@ window.imprimirLote=()=>{
   </body></html>`);
   w.document.close();
 };
+
+// ========== PLANES DE PAGO ==========
+function colPlanes(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'PLANES_PAGO'; }
+
+let PLANES = [];
+let _planActualId = null;
+
+function calcularCuotasOpcion(opcion, mesInicioStr){
+  const cuotas = [];
+  const [y0,m0] = mesInicioStr.split('-').map(Number);
+  let importe = opcion==='1' ? 72739 : 46540;
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  for(let i=0;i<18;i++){
+    const idx = m0-1+i;
+    const y = y0 + Math.floor(idx/12);
+    const m = idx%12;
+    cuotas.push({
+      n: i+1,
+      periodo: meses[m]+' '+y,
+      vencimiento: `${y}-${String(m+1).padStart(2,'0')}-15`,
+      importe: Math.round(importe),
+      estado: 'pendiente', // pendiente | pagada | vencida
+      fechaPago: null
+    });
+    if(opcion==='2') importe = importe*1.05;
+  }
+  return cuotas;
+}
+
+window.previsualizarCuotas = () => {
+  const opcion = document.getElementById('np-opcion').value;
+  const mes = document.getElementById('np-mes-inicio').value;
+  const prev = document.getElementById('np-preview');
+  if(!mes){ prev.textContent=''; return; }
+  const cuotas = calcularCuotasOpcion(opcion, mes);
+  const total = cuotas.reduce((s,c)=>s+c.importe,0);
+  prev.innerHTML = `18 cuotas · primera ${fa(cuotas[0].importe)} (${cuotas[0].periodo}) · última ${fa(cuotas[17].importe)} · nominal total ${fa(total)}`;
+};
+
+window.abrirNuevoPlan = () => {
+  const sel = document.getElementById('np-lote');
+  sel.innerHTML = LB.map(l=>`<option value="${l.l}">${l.l} — ${l.p}</option>`).join('');
+  document.getElementById('np-mes-inicio').value = MES;
+  document.getElementById('np-opcion').value = '2';
+  previsualizarCuotas();
+  document.getElementById('modal-nuevo-plan').style.display = 'block';
+};
+
+window.guardarNuevoPlan = async () => {
+  const lote = document.getElementById('np-lote').value;
+  const opcion = document.getElementById('np-opcion').value;
+  const mesInicio = document.getElementById('np-mes-inicio').value;
+  if(!lote || !mesInicio){ toast('⚠️ Completá lote y mes de inicio'); return; }
+  const loteInfo = LB.find(x=>x.l===lote);
+  const cuotas = calcularCuotasOpcion(opcion, mesInicio);
+  const plan = {
+    lote,
+    propietario: loteInfo ? loteInfo.p : '',
+    opcion,
+    cuotas,
+    caido: false,
+    fechaCreacion: new Date().toISOString().slice(0,10)
+  };
+  await setDoc(doc(db, colPlanes(), lote.replace(/\s+/g,'_')), plan);
+  toast('✅ Plan de pago creado · '+lote);
+  document.getElementById('modal-nuevo-plan').style.display = 'none';
+  cargarPlanes();
+};
+
+async function cargarPlanes(){
+  const snap = await getDocs(collection(db, colPlanes()));
+  const hoy = new Date();
+  PLANES = [];
+  for(const d of snap.docs){
+    const plan = {id:d.id, ...d.data()};
+    // Marcar vencidas las cuotas pendientes cuya fecha de vencimiento ya pasó
+    let cambio = false;
+    plan.cuotas.forEach(c=>{
+      if(c.estado==='pendiente' && new Date(c.vencimiento+'T23:59:59') < hoy){
+        c.estado = 'vencida';
+        cambio = true;
+      }
+    });
+    if(plan.cuotas.some(c=>c.estado==='vencida') && !plan.caido){
+      plan.caido = true;
+      cambio = true;
+    }
+    if(cambio){
+      await setDoc(doc(db, colPlanes(), plan.id), plan);
+    }
+    PLANES.push(plan);
+  }
+  renderPlanes();
+}
+
+function renderPlanes(){
+  const vigentes = PLANES.filter(p=>!p.caido).length;
+  const caidos = PLANES.filter(p=>p.caido).length;
+  document.getElementById('plan-cnt-vig').textContent = vigentes;
+  document.getElementById('plan-cnt-caidos').textContent = caidos;
+
+  if(!PLANES.length){
+    document.getElementById('lista-planes').innerHTML = '<div class="empty">Todavía no hay planes de pago cargados</div>';
+    return;
+  }
+  document.getElementById('lista-planes').innerHTML = PLANES.map(p=>{
+    const pagadas = p.cuotas.filter(c=>c.estado==='pagada').length;
+    return `<div class="lc ${p.caido?'pen':'pag'}" style="cursor:pointer" onclick="abrirDetallePlan('${p.id}')">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name">${p.lote} — ${p.propietario}</div>
+          <div class="lc-sub"><span>Opción ${p.opcion}</span><span>${pagadas}/18 cuotas pagadas</span></div>
+        </div>
+        <span style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap;background:${p.caido?'#fdecea':'#e8f5e9'};color:${p.caido?'#c62828':'#1a7a4a'}">${p.caido?'Plan caído':'Al día'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.abrirDetallePlan = (id) => {
+  _planActualId = id;
+  document.getElementById('plan-lista-view').style.display = 'none';
+  document.getElementById('plan-detalle-view').style.display = 'block';
+  renderDetallePlan();
+};
+
+window.cerrarDetallePlan = () => {
+  document.getElementById('plan-detalle-view').style.display = 'none';
+  document.getElementById('plan-lista-view').style.display = 'block';
+  cargarPlanes();
+};
+
+function renderDetallePlan(){
+  const p = PLANES.find(x=>x.id===_planActualId);
+  if(!p) return;
+  document.getElementById('pd-nombre').textContent = p.lote + ' — ' + p.propietario;
+  document.getElementById('pd-sub').textContent = 'Opción '+p.opcion+' · 18 cuotas · desde '+p.cuotas[0].periodo;
+  const badge = document.getElementById('pd-badge');
+  badge.textContent = p.caido ? 'Plan caído' : 'Al día';
+  badge.style.background = p.caido ? '#fdecea' : '#e8f5e9';
+  badge.style.color = p.caido ? '#c62828' : '#1a7a4a';
+
+  const alerta = document.getElementById('pd-alerta');
+  alerta.innerHTML = p.caido
+    ? `<div style="background:#fdecea;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #e53935">⚠️ Plan caído por cuota impaga al vencimiento (cláusula QUINTA). El lote vuelve a deuda extraordinaria general + 4% de interés punitorio mensual.</div>`
+    : '';
+
+  document.getElementById('pd-cuotas').innerHTML = p.cuotas.map(c=>{
+    const colores = {pagada:'#1a7a4a', vencida:'#e53935', pendiente:'#888'};
+    const etiquetas = {pagada:'Pagada', vencida:'Vencida', pendiente:'Pendiente'};
+    const accion = (!p.caido && c.estado!=='pagada')
+      ? `<button class="btn-sm" onclick="cobrarCuotaPlan('${p.id}',${c.n})">Cobrar</button>`
+      : '';
+    return `<tr>
+      <td>${c.n}/18</td>
+      <td>${c.periodo}</td>
+      <td class="num">${fa(c.importe)}</td>
+      <td style="color:${colores[c.estado]};font-weight:700">${etiquetas[c.estado]}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Registrar el cobro de una cuota: marca la cuota como pagada en el plan Y
+// además, si el mes de esa cuota coincide con el mes seleccionado en la app,
+// pre-carga el formulario de Cobros para que quede asentado como cobro real.
+window.cobrarCuotaPlan = async (planId, n) => {
+  const p = PLANES.find(x=>x.id===planId);
+  if(!p) return;
+  const cuota = p.cuotas.find(c=>c.n===n);
+  if(!cuota) return;
+  cuota.estado = 'pagada';
+  cuota.fechaPago = new Date().toISOString().slice(0,10);
+  await setDoc(doc(db, colPlanes(), p.id), p);
+  toast(`✅ Cuota ${n}/18 marcada como pagada · ${p.lote}`);
+  registrarActividad(`Cobró cuota ${n}/18 del plan de pagos de ${p.lote} (${p.propietario}) · ${fa(cuota.importe)}`);
+  renderDetallePlan();
+  toast('Recordá asentar este cobro también en la pestaña "Cobros del mes" para que impacte en la rendición');
+};
+
+window.borrarPlan = async () => {
+  const p = PLANES.find(x=>x.id===_planActualId);
+  if(!p) return;
+  if(!confirm(`¿Eliminar el plan de pago de ${p.lote}? Esta acción no se puede deshacer.`)) return;
+  await deleteDoc(doc(db, colPlanes(), p.id));
+  toast('🗑️ Plan eliminado');
+  cerrarDetallePlan();
+};
+// ========== FIN PLANES DE PAGO ==========
 
 // INIT
 if(location.hash.startsWith('#verificar/')){
