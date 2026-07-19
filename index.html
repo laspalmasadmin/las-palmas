@@ -3777,7 +3777,9 @@ function renderDetallePlan(){
     const etiquetas = {pagada:'Pagada', vencida:'Vencida', pendiente:'Pendiente'};
     const accion = (!p.caido && c.estado!=='pagada')
       ? `<button class="btn-sm" onclick="abrirCobrarCuota('${p.id}',${c.n})">Cobrar</button>`
-      : '';
+      : (!p.caido && c.estado==='pagada')
+        ? `<button class="btn-sm" style="background:#fff;border-color:#c62828;color:#c62828" onclick="deshacerCuotaPlan('${p.id}',${c.n})">↩️ Deshacer</button>`
+        : '';
     return `<tr>
       <td>${c.n}/18</td>
       <td>${c.periodo}</td>
@@ -3937,6 +3939,24 @@ async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, cap
     toast('❌ Error generando recibo digital: '+e.message);
   }
 }
+
+// Revierte una cuota marcada "pagada" a "pendiente" en el plan. OJO: esto
+// SOLO afecta el seguimiento del plan — si ya se registró el cobro real y/o
+// se generó el recibo digital, esos hay que deshacerlos aparte (Anular
+// recibo en "Ver recibos", o borrar el cobro en "Cobros del mes").
+window.deshacerCuotaPlan = async (planId, n) => {
+  const p = PLANES.find(x=>x.id===planId);
+  if(!p) return;
+  const cuota = p.cuotas.find(c=>c.n===n);
+  if(!cuota) return;
+  if(!confirm(`¿Deshacer la cuota ${n}/${p.cuotas.length} de ${p.lote}?\n\nOJO: esto solo la vuelve a "Pendiente" acá en el plan. Si ya generaste el cobro y/o el recibo digital, tenés que anularlos aparte (pestaña "Ver recibos" → Anular, o "Cobros del mes" → 🗑️).`)) return;
+  cuota.estado = 'pendiente';
+  cuota.fechaPago = null;
+  await setDoc(doc(db, colPlanes(), p.id), p);
+  toast(`↩️ Cuota ${n}/${p.cuotas.length} vuelta a pendiente · ${p.lote}`);
+  registrarActividad(`Deshizo la cuota ${n}/${p.cuotas.length} del plan de pagos de ${p.lote} (${p.propietario})`);
+  renderDetallePlan();
+};
 
 window.borrarPlan = async () => {
   const p = PLANES.find(x=>x.id===_planActualId);
