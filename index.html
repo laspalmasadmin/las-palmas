@@ -384,7 +384,23 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
   </div>
 
-  <!-- Modal nuevo plan -->
+  <!-- Modal cobrar cuota (registra cobro real + recibo digital) -->
+  <div id="modal-cobrar-cuota" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto">
+    <div style="background:#fff;border-radius:12px;padding:16px;margin:30px auto;max-width:420px">
+      <div class="ct" id="cc-titulo">💰 Cobrar cuota</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px" id="cc-sub"></div>
+      <div class="fg"><label>Fecha del pago</label><input type="date" id="cc-fecha"></div>
+      <div class="fg"><label>Forma</label><select id="cc-forma"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0">
+        <input type="checkbox" id="cc-recibo-digital" checked style="width:16px;height:16px">
+        <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR)</span>
+      </label>
+      <button class="btn" id="btn-cc" onclick="cobrarCuotaPlan()">✓ Registrar cobro</button>
+      <button class="btn gr" onclick="document.getElementById('modal-cobrar-cuota').style.display='none'">Cancelar</button>
+      <div id="cc-recibo-out"></div>
+    </div>
+  </div>
+
   <div id="modal-nuevo-plan" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto">
     <div style="background:#fff;border-radius:12px;padding:16px;margin:30px auto;max-width:420px">
       <div class="ct">📑 Nuevo plan de pago</div>
@@ -3749,7 +3765,7 @@ function renderDetallePlan(){
     const colores = {pagada:'#1a7a4a', vencida:'#e53935', pendiente:'#888'};
     const etiquetas = {pagada:'Pagada', vencida:'Vencida', pendiente:'Pendiente'};
     const accion = (!p.caido && c.estado!=='pagada')
-      ? `<button class="btn-sm" onclick="cobrarCuotaPlan('${p.id}',${c.n})">Cobrar</button>`
+      ? `<button class="btn-sm" onclick="abrirCobrarCuota('${p.id}',${c.n})">Cobrar</button>`
       : '';
     return `<tr>
       <td>${c.n}/18</td>
@@ -3776,22 +3792,123 @@ window.confirmarCaducidad = async (planId) => {
   renderDetallePlan();
 };
 
-// Registrar el cobro de una cuota: marca la cuota como pagada en el plan Y
-// además, si el mes de esa cuota coincide con el mes seleccionado en la app,
-// pre-carga el formulario de Cobros para que quede asentado como cobro real.
-window.cobrarCuotaPlan = async (planId, n) => {
+// Registrar el cobro de una cuota del plan: abre el modal para confirmar
+// fecha y forma de pago.
+let _cuotaACobrar = null; // {planId, n}
+window.abrirCobrarCuota = (planId, n) => {
   const p = PLANES.find(x=>x.id===planId);
-  if(!p) return;
   const cuota = p.cuotas.find(c=>c.n===n);
-  if(!cuota) return;
-  cuota.estado = 'pagada';
-  cuota.fechaPago = new Date().toISOString().slice(0,10);
-  await setDoc(doc(db, colPlanes(), p.id), p);
-  toast(`✅ Cuota ${n}/18 marcada como pagada · ${p.lote}`);
-  registrarActividad(`Cobró cuota ${n}/18 del plan de pagos de ${p.lote} (${p.propietario}) · ${fa(cuota.importe)}`);
-  renderDetallePlan();
-  toast('Recordá asentar este cobro también en la pestaña "Cobros del mes" para que impacte en la rendición');
+  if(!p || !cuota) return;
+  _cuotaACobrar = {planId, n};
+  document.getElementById('cc-titulo').textContent = `💰 Cobrar cuota ${n}/${p.cuotas.length}`;
+  document.getElementById('cc-sub').textContent = `${p.lote} — ${p.propietario} · ${cuota.periodo} · ${fa(cuota.importe)}`;
+  document.getElementById('cc-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cc-forma').value = 'Transferencia';
+  document.getElementById('cc-recibo-digital').checked = true;
+  document.getElementById('cc-recibo-out').innerHTML = '';
+  document.getElementById('modal-cobrar-cuota').style.display = 'block';
 };
+
+// Confirma el cobro: 1) marca la cuota pagada en PLANES_PAGO, 2) crea el
+// cobro real en la colección del mes (C_YYYYMM) para que impacte en la
+// rendición y en Deudores, 3) si corresponde, genera el recibo digital con
+// la leyenda "Cuota N/Total — Plan de Pagos por Extraordinarias".
+window.cobrarCuotaPlan = async () => {
+  if(!_cuotaACobrar) return;
+  const {planId, n} = _cuotaACobrar;
+  const p = PLANES.find(x=>x.id===planId);
+  const cuota = p.cuotas.find(c=>c.n===n);
+  if(!p || !cuota) return;
+  const btn = document.getElementById('btn-cc');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const loteInfo = LB.find(x=>x.l===p.lote);
+    const fecha = document.getElementById('cc-fecha').value || new Date().toISOString().slice(0,10);
+    const forma = document.getElementById('cc-forma').value;
+    const planLabel = `Cuota ${n}/${p.cuotas.length} — Plan de Pagos por Extraordinarias (Opción ${p.opcion}) — ${cuota.periodo}`;
+
+    const cobro = {
+      n: loteInfo ? loteInfo.n : null,
+      conc: 'extraordinaria',
+      per: ['otro'],
+      monto: cuota.importe,
+      interes: 0,
+      interesPer: {},
+      capitalPer: {otro: cuota.importe},
+      forma,
+      recibo: '—',
+      fecha,
+      lemon: '',
+      comprobanteImg: '',
+      obs: planLabel,
+      planLabel,
+      planId: p.id,
+      planCuota: n
+    };
+    const cobroRef = await addDoc(collection(db, colC()), cobro);
+
+    cuota.estado = 'pagada';
+    cuota.fechaPago = fecha;
+    await setDoc(doc(db, colPlanes(), p.id), p);
+
+    toast(`✅ Cobro registrado · Cuota ${n}/${p.cuotas.length} · ${p.lote}`);
+    registrarActividad(`Cobró cuota ${n}/${p.cuotas.length} del plan de pagos de ${p.lote} (${p.propietario}) · ${fa(cuota.importe)}`);
+
+    if(document.getElementById('cc-recibo-digital').checked){
+      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, planLabel);
+    }
+    renderDetallePlan();
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
+  btn.disabled = false; btn.textContent = '✓ Registrar cobro';
+};
+
+// Versión del recibo digital para cobros de cuotas de un plan: reutiliza el
+// mismo armado de PDF/QR que generarReciboDigital, pero con la leyenda del
+// plan como concepto y sin depender de los campos del formulario de Cobros
+// (que están en otra pestaña).
+async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel){
+  const out = document.getElementById('cc-recibo-out');
+  out.innerHTML = `<div class="empty">Generando recibo...</div>`;
+  try{
+    const conceptos = [{label: planLabel, cap: cobro.monto, int: 0, subtotal: cobro.monto}];
+    const numero = await obtenerProximoReciboDigital();
+    const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
+    const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
+    const reciboDoc = {
+      recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
+      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
+      lemon:'', comprobanteImg:'', prueba:MODO_PRUEBA,
+      urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
+      cobroId:cobroId||'', cobroColeccion:colC()
+    };
+    await addDoc(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), reciboDoc);
+
+    const firmanteSel = document.getElementById('sel-firmante');
+    const firmanteId = firmanteSel ? firmanteSel.value : '';
+    const meta = {recibo:numero, codigo, urlVerificacion, firmanteId, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
+    const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
+    const filename = `Recibo_${numero}_${(loteInfo?loteInfo.p:'').replace(/\s+/g,'_')}.pdf`;
+    const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
+    const resumenTexto = `Recibo N.º ${numero} — ${loteInfo?loteInfo.l:''} — ${loteInfo?loteInfo.p:''} — Total: $${Math.round(cobro.monto).toLocaleString('es-AR')}`;
+    window['_pdfPendiente_'+numero] = pdfDoc;
+
+    out.innerHTML = `
+      <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px;margin-top:8px">
+        <div style="font-size:12px;font-weight:700;color:#1a7a4a;margin-bottom:6px">🧾 Recibo N.º ${numero} generado</div>
+        <iframe src="${blobUrl}" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px"></iframe>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick='imprimirPDF(window._pdfPendiente_${numero})'>🖨️ Imprimir</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfPendiente_${numero}, "${filename}", ${JSON.stringify(resumenTexto)})'>📱 WhatsApp</button>
+        </div>
+      </div>`;
+  } catch(e){
+    console.error(e);
+    toast('❌ Error generando recibo digital: '+e.message);
+  }
+}
 
 window.borrarPlan = async () => {
   const p = PLANES.find(x=>x.id===_planActualId);
