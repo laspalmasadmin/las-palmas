@@ -164,6 +164,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <option value="2026-07">Julio 2026</option>
     </select>
     <div class="dot" id="dot"></div>
+    <button onclick="abrirBuscador()" title="Buscar lote o propietario" style="font-size:13px;padding:4px 9px;border-radius:6px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer">🔍</button>
     <button onclick="cerrarSesion()" style="font-size:10px;padding:4px 8px;border-radius:6px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer">Salir</button>
   </div>
 </div>
@@ -172,20 +173,62 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 </div>
 
 <div class="tabs">
-  <button class="tab on" onclick="ST('cob',this)">💰 Cobros del mes</button>
-  <button class="tab" onclick="ST('rend',this)">📋 Informe mensual</button>
-  <button class="tab" onclick="ST('egr',this)">📤 Gastos</button>
-  <button class="tab" onclick="ST('deu',this)">⚠️ Deudores</button>
-  <button class="tab" onclick="ST('plan',this)">📑 Planes de pago</button>
-  <button class="tab" onclick="ST('int',this)">📐 Calcular intereses</button>
-  <button class="tab" onclick="ST('est',this)">📊 Resumen financiero</button>
-  <button class="tab" onclick="ST('rec',this)">🧾 Ver recibos</button>
-  <button class="tab" onclick="ST('conc',this)">🏦 Control bancario</button>
-  <button class="tab" onclick="ST('act',this)">📜 Historial</button>
+  <button class="tab on" data-tab="ini" onclick="ST('ini',this)">🏠 Inicio</button>
+  <button class="tab" data-tab="cob" onclick="ST('cob',this)">💰 Cobros del mes</button>
+  <button class="tab" data-tab="rend" onclick="ST('rend',this)">📋 Informe mensual</button>
+  <button class="tab" data-tab="egr" onclick="ST('egr',this)">📤 Gastos</button>
+  <button class="tab" data-tab="deu" onclick="ST('deu',this)">⚠️ Deudores</button>
+  <button class="tab" data-tab="plan" onclick="ST('plan',this)">📑 Planes de pago</button>
+  <button class="tab" data-tab="int" onclick="ST('int',this)">📐 Calcular intereses</button>
+  <button class="tab" data-tab="est" onclick="ST('est',this)">📊 Resumen financiero</button>
+  <button class="tab" data-tab="rec" onclick="ST('rec',this)">🧾 Ver recibos</button>
+  <button class="tab" data-tab="conc" onclick="ST('conc',this)">🏦 Control bancario</button>
+  <button class="tab" data-tab="act" onclick="ST('act',this)">📜 Historial</button>
+</div>
+
+<!-- INICIO -->
+<div id="pnl-ini" class="pnl on">
+  <div class="card">
+    <div class="ct">🏘 Barrio Las Palmas — <span id="ini-mes"></span></div>
+    <div class="g2">
+      <div class="met"><div class="ml">Cobrado este mes</div><div class="mv vd" id="ini-cobrado" style="font-size:13px">—</div></div>
+      <div class="met"><div class="ml">Egresos este mes</div><div class="mv" id="ini-egresos" style="font-size:13px;color:#e53935">—</div></div>
+      <div class="met"><div class="ml">Saldo del mes</div><div class="mv vd" id="ini-saldo" style="font-size:13px">—</div></div>
+      <div class="met"><div class="ml">% avance cobros</div><div class="mv nj" id="ini-avance">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">⚠️ Deudores</div>
+    <div class="g2">
+      <div class="met"><div class="ml">Lotes con deuda</div><div class="mv rj" id="ini-deu-cnt">—</div></div>
+      <div class="met"><div class="ml">Deuda total</div><div class="mv rj" id="ini-deu-tot" style="font-size:13px">—</div></div>
+    </div>
+    <button class="btn-sm" style="width:100%;margin-top:8px;background:#fff;border:1px solid #e53935;color:#e53935;font-weight:700" onclick="irATab('deu')">Ver listado de deudores →</button>
+  </div>
+  <div class="card">
+    <div class="ct">🚀 Accesos rápidos</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn-sm" onclick="irATab('cob')">💰 Cobros</button>
+      <button class="btn-sm" onclick="irATab('egr')">📤 Gastos</button>
+      <button class="btn-sm" onclick="irATab('rend')">📋 Informe mensual</button>
+      <button class="btn-sm" onclick="irATab('rec')">🧾 Recibos</button>
+      <button class="btn-sm" onclick="irATab('plan')">📑 Planes de pago</button>
+      <button class="btn-sm" onclick="irATab('conc')">🏦 Control bancario</button>
+    </div>
+  </div>
+</div>
+
+<!-- BUSCADOR GLOBAL -->
+<div class="modal" id="mod-buscar">
+  <div class="mbox">
+    <div class="mhdr"><div class="mtit">🔍 Buscar lote o propietario</div><button class="mclose" onclick="cerrar('mod-buscar')">✕</button></div>
+    <input class="srch" type="search" id="buscar-global-input" placeholder="Nombre o número de lote..." oninput="buscarGlobal(this.value)" style="width:100%;margin-bottom:10px">
+    <div id="buscar-global-resultados"></div>
+  </div>
 </div>
 
 <!-- COBRANZAS -->
-<div id="pnl-cob" class="pnl on">
+<div id="pnl-cob" class="pnl">
   <div class="g2">
     <div class="met"><div class="ml">Lotes con cobros</div><div class="mv vd" id="m-pag">—</div></div>
     <div class="met"><div class="ml">Sin cobros</div><div class="mv rj" id="m-pen">—</div></div>
@@ -887,6 +930,63 @@ window.ST = (n,el)=>{
   if(n==='rend') renderRend();
   if(n==='conc') renderConc();
   if(n==='plan') cargarPlanes();
+  if(n==='ini') renderInicio();
+};
+
+window.irATab = (n) => {
+  const el = document.querySelector('.tab[data-tab="'+n+'"]');
+  if(el) ST(n, el);
+};
+
+// ── INICIO (portada / dashboard) ──
+function renderInicio(){
+  const ingCobrado = COBROS.reduce((s,c)=>s+(c.monto||0),0);
+  const egr = EGRESOS.reduce((s,e)=>s+(e.m||0),0);
+  const lotesConCobro = new Set(COBROS.map(c=>parseInt(c.n))).size;
+  const avance = LB.length ? Math.round(lotesConCobro/LB.length*100) : 0;
+
+  const iniMes = document.getElementById('ini-mes'); if(iniMes) iniMes.textContent = MES_NOM;
+  const setTxt = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+  setTxt('ini-cobrado', fa(ingCobrado));
+  setTxt('ini-egresos', fa(egr));
+  setTxt('ini-saldo', fa(ingCobrado-egr));
+  setTxt('ini-avance', avance+'%');
+
+  // Reutiliza los totales ya calculados por renderDeu() en la pestaña Deudores
+  const deuCnt = document.getElementById('deu-cnt');
+  const deuTot = document.getElementById('deu-tot-gen');
+  setTxt('ini-deu-cnt', deuCnt ? deuCnt.textContent : '—');
+  setTxt('ini-deu-tot', deuTot ? deuTot.textContent : '—');
+}
+
+// ── BUSCADOR GLOBAL ──
+window.abrirBuscador = () => {
+  document.getElementById('mod-buscar').style.display='block';
+  const input = document.getElementById('buscar-global-input');
+  input.value=''; document.getElementById('buscar-global-resultados').innerHTML='';
+  setTimeout(()=>input.focus(), 50);
+};
+
+window.buscarGlobal = (v) => {
+  const q = v.trim().toLowerCase();
+  const el = document.getElementById('buscar-global-resultados');
+  if(!q){ el.innerHTML=''; return; }
+  const matches = LB.filter(b=>b.l.toLowerCase().includes(q)||b.p.toLowerCase().includes(q)).slice(0,15);
+  if(!matches.length){ el.innerHTML='<div class="empty">Sin resultados</div>'; return; }
+  el.innerHTML = matches.map(b=>`
+    <div class="log-item" style="cursor:pointer" onclick="irALoteDesdeBusqueda(${b.n})">
+      <div><span style="font-size:11px;font-weight:700;color:#14603a;background:#e8f5ee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+    </div>`).join('');
+};
+
+window.irALoteDesdeBusqueda = (n) => {
+  const b = LB.find(x=>x.n===n);
+  cerrar('mod-buscar');
+  irATab('cob');
+  filtL = (b ? b.l.toLowerCase() : '');
+  const srchInput = document.querySelector('#pnl-cob .srch');
+  if(srchInput) srchInput.value = b ? b.l : '';
+  renderCob();
 };
 
 window.cerrar = id => document.getElementById(id).style.display='none';
@@ -904,7 +1004,7 @@ window.cambiarMes = val => {
   document.getElementById('hdr-p').textContent = 'Cobranzas ' + MES_NOM;
   document.getElementById('rend-tit').textContent = 'Rendición — ' + MES_NOM;
   COBROS = []; EGRESOS = [];
-  renderCob(); renderRend(); renderEgr(); actualizarEstado();
+  renderCob(); renderRend(); renderEgr(); actualizarEstado(); renderInicio();
   setDot(false);
   listenCobros();
   listenEgresos();
@@ -936,6 +1036,7 @@ async function cargarTodosCobros(){
   }
   renderDeu();
   if(window.actualizarDeudaPreview) window.actualizarDeudaPreview();
+  renderInicio();
 }
 
 function listenCobros(){
@@ -952,6 +1053,7 @@ function listenCobros(){
     poblarRS();
     actualizarEstado();
     renderConc();
+    renderInicio();
     cargarTodosCobros();
     // Auto-numerar recibo
     const nums = COBROS.map(c=>parseInt(c.recibo)).filter(n=>!isNaN(n));
@@ -974,6 +1076,7 @@ function listenEgresos(){
     snap.forEach(d=>{ EGRESOS.push({...d.data(), _id:d.id}); });
     renderEgr();
     actualizarEstado();
+    renderInicio();
   });
 }
 
