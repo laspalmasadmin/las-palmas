@@ -392,6 +392,15 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <div class="fg"><label>Fecha del pago</label><input type="date" id="cc-fecha"></div>
       <div class="fg"><label>Forma</label><select id="cc-forma"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0">
+        <input type="checkbox" id="cc-incluye-ord" onchange="document.getElementById('cc-ord-box').style.display=this.checked?'block':'none'" style="width:16px;height:16px">
+        <span style="font-size:12px;font-weight:700">➕ También paga expensa ordinaria en este mismo pago</span>
+      </label>
+      <div id="cc-ord-box" style="display:none;background:#f7f7f7;border-radius:8px;padding:8px;margin-bottom:8px">
+        <div class="fg"><label>Período ordinario</label><select id="cc-ord-periodo"></select></div>
+        <div class="fg"><label>Importe capital</label><input type="number" id="cc-ord-capital" placeholder="0"></div>
+        <div class="fg"><label>Interés (si corresponde)</label><input type="number" id="cc-ord-interes" placeholder="0"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0">
         <input type="checkbox" id="cc-recibo-digital" checked style="width:16px;height:16px">
         <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR)</span>
       </label>
@@ -2411,7 +2420,7 @@ const PERIOD_MES_ANIO = {
   xr:'Marzo 2026', xa:'Abril 2026', xy:'Mayo 2026', ju_ext:'Junio 2026', jul_ext:'Julio 2026'
 };
 
-function _conceptosDesdeForm(cobro, capitalPer, interesPer){
+function _conceptosDesdeForm(cobro, capitalPer, interesPer, labelOverrides){
   const claves = [...new Set([...Object.keys(capitalPer), ...Object.keys(interesPer)])];
   const tipoLabel = tipoL(cobro.conc);
   if(!claves.length){
@@ -2426,9 +2435,11 @@ function _conceptosDesdeForm(cobro, capitalPer, interesPer){
     // general del cobro — así en un recibo combinado (ambas) cada renglón se
     // etiqueta bien como Ordinaria o Extraordinaria según corresponda.
     let labelCap, labelInt;
-    const mesAnio = PERIOD_MES_ANIO[k] || PERIOD_LABELS[k];
-    if(esOrd(k)){ labelCap = `${mesAnio} · Exp. Ordinaria`; labelInt = `${mesAnio} · Interés Ordinaria`; }
-    else if(esExt(k)){ labelCap = `${mesAnio} · Exp. Extraordinaria`; labelInt = `${mesAnio} · Interés Extraordinaria`; }
+    if(labelOverrides && labelOverrides[k]){
+      labelCap = labelOverrides[k]; labelInt = `${labelOverrides[k]} · Interés`;
+    }
+    else if(esOrd(k)){ labelCap = `${PERIOD_MES_ANIO[k] || PERIOD_LABELS[k]} · Exp. Ordinaria`; labelInt = `${PERIOD_MES_ANIO[k] || PERIOD_LABELS[k]} · Interés Ordinaria`; }
+    else if(esExt(k)){ labelCap = `${PERIOD_MES_ANIO[k] || PERIOD_LABELS[k]} · Exp. Extraordinaria`; labelInt = `${PERIOD_MES_ANIO[k] || PERIOD_LABELS[k]} · Interés Extraordinaria`; }
     else { labelCap = tipoLabel; labelInt = `${tipoLabel} · Interés`; }
     if(cap) lineas.push({label:labelCap, cap, int:0, subtotal:cap});
     if(int) lineas.push({label:labelInt, cap:0, int, subtotal:int});
@@ -3805,6 +3816,11 @@ window.abrirCobrarCuota = (planId, n) => {
   document.getElementById('cc-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('cc-forma').value = 'Transferencia';
   document.getElementById('cc-recibo-digital').checked = true;
+  document.getElementById('cc-incluye-ord').checked = false;
+  document.getElementById('cc-ord-box').style.display = 'none';
+  document.getElementById('cc-ord-periodo').innerHTML = PERIODOS_ORD.map(p=>`<option value="${p.k}">${p.label}</option>`).join('');
+  document.getElementById('cc-ord-capital').value = '';
+  document.getElementById('cc-ord-interes').value = '';
   document.getElementById('cc-recibo-out').innerHTML = '';
   document.getElementById('modal-cobrar-cuota').style.display = 'block';
 };
@@ -3827,14 +3843,26 @@ window.cobrarCuotaPlan = async () => {
     const forma = document.getElementById('cc-forma').value;
     const planLabel = `Cuota ${n}/${p.cuotas.length} — Plan de Pagos por Extraordinarias (Opción ${p.opcion}) — ${cuota.periodo}`;
 
+    const capitalPer = {otro: cuota.importe};
+    const interesPer = {};
+    const incluyeOrd = document.getElementById('cc-incluye-ord').checked;
+    if(incluyeOrd){
+      const ordKey = document.getElementById('cc-ord-periodo').value;
+      const ordCap = parseInt(document.getElementById('cc-ord-capital').value) || 0;
+      const ordInt = parseInt(document.getElementById('cc-ord-interes').value) || 0;
+      if(ordCap) capitalPer[ordKey] = ordCap;
+      if(ordInt) interesPer[ordKey] = ordInt;
+    }
+    const montoTotal = Object.values(capitalPer).reduce((s,v)=>s+v,0) + Object.values(interesPer).reduce((s,v)=>s+v,0);
+
     const cobro = {
       n: loteInfo ? loteInfo.n : null,
-      conc: 'extraordinaria',
-      per: ['otro'],
-      monto: cuota.importe,
-      interes: 0,
-      interesPer: {},
-      capitalPer: {otro: cuota.importe},
+      conc: incluyeOrd ? 'ambas' : 'extraordinaria',
+      per: Object.keys(capitalPer),
+      monto: montoTotal,
+      interes: Object.values(interesPer).reduce((s,v)=>s+v,0),
+      interesPer,
+      capitalPer,
       forma,
       recibo: '—',
       fecha,
@@ -3852,10 +3880,10 @@ window.cobrarCuotaPlan = async () => {
     await setDoc(doc(db, colPlanes(), p.id), p);
 
     toast(`✅ Cobro registrado · Cuota ${n}/${p.cuotas.length} · ${p.lote}`);
-    registrarActividad(`Cobró cuota ${n}/${p.cuotas.length} del plan de pagos de ${p.lote} (${p.propietario}) · ${fa(cuota.importe)}`);
+    registrarActividad(`Cobró cuota ${n}/${p.cuotas.length} del plan de pagos de ${p.lote} (${p.propietario}) · ${fa(cuota.importe)}${incluyeOrd?' + ordinaria':''}`);
 
     if(document.getElementById('cc-recibo-digital').checked){
-      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, planLabel);
+      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, planLabel, capitalPer, interesPer);
     }
     renderDetallePlan();
   } catch(e){
@@ -3868,11 +3896,11 @@ window.cobrarCuotaPlan = async () => {
 // mismo armado de PDF/QR que generarReciboDigital, pero con la leyenda del
 // plan como concepto y sin depender de los campos del formulario de Cobros
 // (que están en otra pestaña).
-async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel){
+async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, capitalPer, interesPer){
   const out = document.getElementById('cc-recibo-out');
   out.innerHTML = `<div class="empty">Generando recibo...</div>`;
   try{
-    const conceptos = [{label: planLabel, cap: cobro.monto, int: 0, subtotal: cobro.monto}];
+    const conceptos = _conceptosDesdeForm(cobro, capitalPer, interesPer, {otro: planLabel});
     const numero = await obtenerProximoReciboDigital();
     const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
     const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
