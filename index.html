@@ -206,6 +206,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="ct">📈 Cobrabilidad mes a mes</div>
     <div id="ini-comparativo"><div class="empty">Cargando...</div></div>
   </div>
+  <div id="ini-alerta-baja"></div>
   <div class="card">
     <div class="ct">⚠️ Deudores</div>
     <div class="g2">
@@ -1096,6 +1097,36 @@ function renderComparativo(){
       </div>
     </div>`;
   }).join('');
+
+  renderAlertaBajaCobrabilidad();
+}
+
+// Lotes que pagaron el mes anterior pero todavía no en el mes más reciente —
+// para que Juana los persiga uno por uno.
+function renderAlertaBajaCobrabilidad(){
+  const el = document.getElementById('ini-alerta-baja');
+  if(!el) return;
+  const n = MESES_COMPARATIVO.length;
+  if(n < 2){ el.innerHTML=''; return; }
+  const actual = MESES_COMPARATIVO[n-1];
+  const anterior = MESES_COMPARATIVO[n-2];
+  const lotesActual = new Set(TODOS_COBROS.filter(c=>c._mesOrigen===actual.col).map(c=>parseInt(c.n)));
+  const lotesAnterior = new Set(TODOS_COBROS.filter(c=>c._mesOrigen===anterior.col).map(c=>parseInt(c.n)));
+  const faltantes = [...lotesAnterior].filter(n=>!lotesActual.has(n))
+    .map(n=>LB.find(b=>b.n===n)).filter(Boolean)
+    .sort((a,b)=>a.n-b.n);
+
+  if(!faltantes.length){ el.innerHTML=''; return; }
+
+  el.innerHTML = `
+    <div class="card" style="border:1px solid #e53935;background:#fff5f5">
+      <div class="ct" style="color:#e53935">🔴 Pagaron en ${anterior.nom} y todavía no en ${actual.nom}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:6px">${faltantes.length} lote${faltantes.length===1?'':'s'} para hacer seguimiento particular — tocá uno para ir a registrarle el cobro</div>
+      ${faltantes.map(b=>`
+        <div class="log-item" style="cursor:pointer" onclick="irALoteDesdeBusqueda(${b.n})">
+          <div><span style="font-size:11px;font-weight:700;color:#c62828;background:#ffebee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
 function listenCobros(){
