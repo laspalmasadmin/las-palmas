@@ -203,6 +203,10 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
   </div>
   <div class="card">
+    <div class="ct">📈 Cobrabilidad mes a mes</div>
+    <div id="ini-comparativo"><div class="empty">Cargando...</div></div>
+  </div>
+  <div class="card">
     <div class="ct">⚠️ Deudores</div>
     <div class="g2">
       <div class="met"><div class="ml">Lotes con deuda</div><div class="mv rj" id="ini-deu-cnt">—</div></div>
@@ -935,7 +939,7 @@ window.ST = (n,el)=>{
   if(n==='rend') renderRend();
   if(n==='conc') renderConc();
   if(n==='plan') cargarPlanes();
-  if(n==='ini') renderInicio();
+  if(n==='ini') { renderInicio(); renderComparativo(); }
 };
 
 window.irATab = (n) => {
@@ -1047,12 +1051,51 @@ async function cargarTodosCobros(){
   for(const col of meses){
     try {
       const snap = await getDocs(collection(db, col));
-      snap.forEach(d=>{ TODOS_COBROS.push({...d.data(), _id:d.id}); });
+      snap.forEach(d=>{ TODOS_COBROS.push({...d.data(), _id:d.id, _mesOrigen:col}); });
     } catch(e){ /* mes sin datos */ }
   }
   renderDeu();
   if(window.actualizarDeudaPreview) window.actualizarDeudaPreview();
   renderInicio();
+  renderComparativo();
+}
+
+// ── COMPARATIVO MENSUAL (cobrabilidad mes a mes) ──
+const MESES_COMPARATIVO = [
+  {col:'C_202605', nom:'Mayo 2026'},
+  {col:'C_202606', nom:'Junio 2026'},
+  {col:'C_202607', nom:'Julio 2026'},
+];
+function renderComparativo(){
+  const el = document.getElementById('ini-comparativo');
+  if(!el) return;
+  const totalLotes = LB.length;
+  const filas = MESES_COMPARATIVO.map(m=>{
+    const cobs = TODOS_COBROS.filter(c=>c._mesOrigen===m.col);
+    const cobrado = cobs.reduce((s,c)=>s+(c.monto||0),0);
+    const lotes = new Set(cobs.map(c=>parseInt(c.n))).size;
+    const pct = totalLotes ? Math.round(lotes/totalLotes*100) : 0;
+    return {...m, cobrado, lotes, pct};
+  });
+  const max = Math.max(...filas.map(f=>f.pct), 1);
+  el.innerHTML = filas.map((f,i)=>{
+    const prev = i>0 ? filas[i-1] : null;
+    const delta = prev ? f.pct - prev.pct : null;
+    const deltaHtml = delta===null ? '' :
+      delta>0 ? `<span style="color:#1a7a4a;font-weight:700">▲ ${delta}pts vs ${prev.nom.split(' ')[0]}</span>` :
+      delta<0 ? `<span style="color:#e53935;font-weight:700">▼ ${Math.abs(delta)}pts vs ${prev.nom.split(' ')[0]}</span>` :
+      `<span style="color:#888">= vs ${prev.nom.split(' ')[0]}</span>`;
+    return `<div style="margin-bottom:${i<filas.length-1?'10px':'0'}">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:3px">
+        <span>${f.nom}</span>
+        <span>${f.lotes} de ${totalLotes} · ${fa(f.cobrado)}</span>
+      </div>
+      <div class="pb"><div class="pf" style="width:${f.pct}%"></div></div>
+      <div style="font-size:10px;color:#888;margin-top:2px;display:flex;justify-content:space-between">
+        <span>${f.pct}% de avance</span>${deltaHtml}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function listenCobros(){
