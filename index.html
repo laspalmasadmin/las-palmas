@@ -194,6 +194,11 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <div class="met"><div class="ml">Cobrado este mes</div><div class="mv vd" id="ini-cobrado" style="font-size:13px">—</div></div>
       <div class="met"><div class="ml">Egresos este mes</div><div class="mv" id="ini-egresos" style="font-size:13px;color:#e53935">—</div></div>
       <div class="met"><div class="ml">Saldo del mes</div><div class="mv vd" id="ini-saldo" style="font-size:13px">—</div></div>
+      <div class="met"><div class="ml">Lotes cobrados</div><div class="mv nj" id="ini-lotes" style="font-size:13px">—</div></div>
+    </div>
+    <div class="g2" style="margin-top:8px">
+      <div class="met"><div class="ml">↳ Ordinaria</div><div class="mv" id="ini-ord" style="font-size:13px;color:#1565c0">—</div></div>
+      <div class="met"><div class="ml">↳ Extraordinaria</div><div class="mv" id="ini-ext" style="font-size:13px;color:#1a7a4a">—</div></div>
       <div class="met"><div class="ml">% avance cobros</div><div class="mv nj" id="ini-avance">—</div></div>
     </div>
   </div>
@@ -943,13 +948,24 @@ function renderInicio(){
   const ingCobrado = COBROS.reduce((s,c)=>s+(c.monto||0),0);
   const egr = EGRESOS.reduce((s,e)=>s+(e.m||0),0);
   const lotesConCobro = new Set(COBROS.map(c=>parseInt(c.n))).size;
-  const avance = LB.length ? Math.round(lotesConCobro/LB.length*100) : 0;
+  const totalLotes = LB.length;
+  const avance = totalLotes ? Math.round(lotesConCobro/totalLotes*100) : 0;
+
+  let ord=0, ext=0;
+  COBROS.forEach(c=>{
+    const d = desglosarCobro(c);
+    ord += d.capOrd + d.capCargo + d.intOrd;
+    ext += d.capExt + d.intExt;
+  });
 
   const iniMes = document.getElementById('ini-mes'); if(iniMes) iniMes.textContent = MES_NOM;
   const setTxt = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
   setTxt('ini-cobrado', fa(ingCobrado));
   setTxt('ini-egresos', fa(egr));
   setTxt('ini-saldo', fa(ingCobrado-egr));
+  setTxt('ini-lotes', lotesConCobro+' de '+totalLotes);
+  setTxt('ini-ord', fa(ord));
+  setTxt('ini-ext', fa(ext));
   setTxt('ini-avance', avance+'%');
 
   // Reutiliza los totales ya calculados por renderDeu() en la pestaña Deudores
