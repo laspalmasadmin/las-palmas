@@ -1103,6 +1103,8 @@ function renderComparativo(){
 
 // Lotes que pagaron el mes anterior pero todavía no en el mes más reciente —
 // para que Juana los persiga uno por uno.
+let _ULT_FALTANTES = { faltantes: [], actual: null, anterior: null };
+
 function renderAlertaBajaCobrabilidad(){
   const el = document.getElementById('ini-alerta-baja');
   if(!el) return;
@@ -1116,18 +1118,52 @@ function renderAlertaBajaCobrabilidad(){
     .map(n=>LB.find(b=>b.n===n)).filter(Boolean)
     .sort((a,b)=>a.n-b.n);
 
+  _ULT_FALTANTES = { faltantes, actual, anterior };
+
   if(!faltantes.length){ el.innerHTML=''; return; }
 
   el.innerHTML = `
     <div class="card" style="border:1px solid #e53935;background:#fff5f5">
       <div class="ct" style="color:#e53935">🔴 Pagaron en ${anterior.nom} y todavía no en ${actual.nom}</div>
       <div style="font-size:11px;color:#888;margin-bottom:6px">${faltantes.length} lote${faltantes.length===1?'':'s'} para hacer seguimiento particular — tocá uno para ir a registrarle el cobro</div>
+      <button class="btn-sm" style="width:100%;margin-bottom:8px" onclick="copiarAvisoTodos()">📋 Copiar aviso para todos</button>
       ${faltantes.map(b=>`
-        <div class="log-item" style="cursor:pointer" onclick="irALoteDesdeBusqueda(${b.n})">
-          <div><span style="font-size:11px;font-weight:700;color:#c62828;background:#ffebee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+        <div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+          <div style="cursor:pointer;flex:1" onclick="irALoteDesdeBusqueda(${b.n})"><span style="font-size:11px;font-weight:700;color:#c62828;background:#ffebee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+          <span style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarAvisoLote(${b.n})">📋 Aviso</span>
         </div>`).join('')}
     </div>`;
 }
+
+function textoAviso(b, anterior, actual){
+  return `Estimado/a ${b.p}:\n\nLe recordamos que la cuota de expensas de ${actual.nom} del Consorcio Barrio Las Palmas (${b.l}) figura pendiente de pago, ya que registramos su último pago en ${anterior.nom}.\n\nLe solicitamos regularizar la situación a la brevedad para evitar la generación de intereses por mora.\n\nAnte cualquier consulta, quedamos a disposición.\n\nAdministración Barrio Las Palmas`;
+}
+
+window.copiarAvisoLote = async (n) => {
+  const { faltantes, anterior, actual } = _ULT_FALTANTES;
+  const b = faltantes.find(x=>x.n===n);
+  if(!b) return;
+  const texto = textoAviso(b, anterior, actual);
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast('📋 Aviso copiado — pegalo en WhatsApp o mail');
+  } catch(e){
+    alert(texto); // fallback si el navegador bloquea el portapapeles
+  }
+};
+
+window.copiarAvisoTodos = async () => {
+  const { faltantes, anterior, actual } = _ULT_FALTANTES;
+  if(!faltantes.length) return;
+  const listado = faltantes.map(b=>`• ${b.l} — ${b.p}`).join('\n');
+  const texto = `Deudores de ${actual.nom} que sí pagaron ${anterior.nom} — Consorcio Barrio Las Palmas:\n\n${listado}\n\nSe les solicita regularizar el pago a la brevedad para evitar intereses por mora.`;
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast('📋 Listado copiado — pegalo donde lo necesites');
+  } catch(e){
+    alert(texto);
+  }
+};
 
 function listenCobros(){
   if(_unsubC){ _unsubC(); _unsubC=null; }
