@@ -153,9 +153,10 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" onclick="ST('deu',this)">⚠️ Deudores</button>
   <button class="tab" onclick="ST('plan',this)">📑 Planes de pago</button>
   <button class="tab" onclick="ST('int',this)">📐 Calcular intereses</button>
-  <button class="tab" onclick="ST('est',this)">📊 Resumen financiero</button>
+  <button class="tab" onclick="ST('est',this)">💵 Estado de caja</button>
   <button class="tab" onclick="ST('rec',this)">🧾 Ver recibos</button>
   <button class="tab" onclick="ST('conc',this)">🏦 Control bancario</button>
+  <button class="tab" onclick="ST('com',this)">📢 Comunicados</button>
   <button class="tab" onclick="ST('act',this)">📜 Historial</button>
 </div>
 
@@ -452,15 +453,36 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <!-- ESTADO -->
 <div id="pnl-est" class="pnl">
   <div class="card">
-    <div class="ct">📊 Estado financiero</div>
-    <div class="er"><span class="el">Saldo anterior</span><span style="font-weight:600">$6.022.380</span></div>
-    <div class="er"><span class="el" style="padding-left:10px">Ingresos por cobros</span><span style="color:#1a7a4a;font-weight:600" id="ef-ing">$0</span></div>
-    <div class="er" style="font-size:11px;padding:4px 0 4px 22px;border-bottom:none"><span class="el" style="color:#aaa">↳ Capital</span><span style="color:#1a7a4a" id="ef-ing-cap">$0</span></div>
-    <div class="er" style="font-size:11px;padding:4px 0 4px 22px"><span class="el" style="color:#aaa">↳ Interés</span><span style="color:#e53935" id="ef-ing-int">$0</span></div>
-    <div class="er"><span class="el" style="padding-left:10px">Cheque diferido Morales (vto 12/06)</span><span style="color:#f57c00;font-weight:600">$711.892</span></div>
-    <div class="er"><span class="el" style="font-weight:700">Total ingreso</span><span style="color:#1a7a4a;font-weight:700" id="ef-toting">$0</span></div>
-    <div class="er"><span class="el">Egresos del período</span><span style="color:#e53935;font-weight:600" id="ef-egr">$0</span></div>
-    <div class="er tot"><span class="el">Saldo al cierre</span><span style="color:#1a7a4a" id="ef-saldo">$0</span></div>
+    <div class="ct">💵 Fondo Ordinario</div>
+    <div class="er"><span class="el">Saldo anterior</span><span style="font-weight:600" id="ec-o-ant">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">+ Cobros ordinarios</span><span style="color:#1a7a4a" id="ec-o-ing">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">+ Intereses por mora</span><span style="color:#e53935" id="ec-o-int">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">+ Rendimiento Lemon</span><span style="color:#1a7a4a" id="ec-o-lemon">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">− Egresos del período</span><span style="color:#e53935" id="ec-o-egr">$0</span></div>
+    <div class="er tot"><span class="el">Saldo al cierre</span><span style="color:#1a7a4a" id="ec-o-cierre">$0</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">💰 Fondo Extraordinario</div>
+    <div class="er"><span class="el">Saldo anterior</span><span style="font-weight:600" id="ec-e-ant">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">+ Cobros extraordinarios</span><span style="color:#1a7a4a" id="ec-e-ing">$0</span></div>
+    <div class="er"><span class="el" style="padding-left:10px">+ Intereses por mora</span><span style="color:#e53935" id="ec-e-int">$0</span></div>
+    <div class="er tot"><span class="el">Saldo al cierre</span><span style="color:#1a7a4a" id="ec-e-cierre">$0</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">📊 Saldo consolidado</div>
+    <div class="er tot"><span class="el">Total (Ordinario + Extraordinario)</span><span style="color:#1a7a4a" id="ec-consolidado">$0</span></div>
+  </div>
+  <div class="card" id="ec-mayo-note" style="display:none">
+    <div class="ct">ℹ️ Mes semilla</div>
+    <div style="font-size:12px;color:#666">Mayo 2026 es el punto de partida: el saldo de cierre se tomó directo de la última rendición formal, sin desglose de ingresos/egresos acá.</div>
+  </div>
+  <div class="card">
+    <div class="ct">🏦 Composición del saldo (Lemon + efectivo)</div>
+    <div class="fg"><label>Rendimiento Lemon del mes ($) — dato del banco, se carga a mano cada mes</label><input type="number" id="ec-rend-lemon" placeholder="0"></div>
+    <div class="fg"><label>Efectivo en resguardo de los administradores ($) — queda automático mes a mes salvo que lo cambies acá</label><input type="number" id="ec-efectivo" placeholder="0"></div>
+    <button class="btn" onclick="guardarCaja()">💾 Guardar</button>
+    <div class="er" style="margin-top:10px"><span class="el">Billetera Lemon (calculado automático)</span><span style="font-weight:700;color:#1a7a4a" id="ec-lemon-calc">$0</span></div>
+    <div class="er"><span class="el">Efectivo en resguardo</span><span style="font-weight:700" id="ec-efectivo-calc">$0</span></div>
   </div>
   <div class="card">
     <div class="ct">🏘 Datos del consorcio</div>
@@ -485,6 +507,20 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg"><label>Número de recibo</label><input type="number" id="an-numero" placeholder="ej: 507"></div>
     <button class="btn" onclick="buscarReciboParaAnular()">🔍 Buscar</button>
     <div id="an-resultado"></div>
+  </div>
+</div>
+
+<!-- COMUNICADOS -->
+<div id="pnl-com" class="pnl">
+  <div class="card" id="card-nuevo-comunicado">
+    <div class="ct">📢 Nuevo comunicado</div>
+    <div class="fg"><label>Título</label><input type="text" id="com-titulo" placeholder="ej: Corte de agua programado"></div>
+    <div class="fg"><label>Texto</label><textarea id="com-texto" rows="3" placeholder="Detalle del comunicado..." style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;font-family:inherit;font-size:13px"></textarea></div>
+    <button class="btn" onclick="agregarComunicado()">📢 Publicar</button>
+  </div>
+  <div class="card">
+    <div class="ct">🗂️ Comunicados publicados</div>
+    <div id="com-lista"><div class="empty">Cargando...</div></div>
   </div>
 </div>
 
@@ -603,7 +639,7 @@ function aplicarModoConsulta(){
   // Ocultar botones de acción
   document.querySelectorAll('.btn.rj, .btn.az, #btn-reg, .btn-ed, .btn-dl, #btn-se, #btn-se2').forEach(el=>el.style.display='none');
   // Ocultar formularios de carga
-  ['imp-file','btn-imp','btn-imp2','fg-lemon','card-backup'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  ['imp-file','btn-imp','btn-imp2','fg-lemon','card-backup','card-nuevo-comunicado'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   // Ocultar tab actividad
   document.querySelectorAll('.tab').forEach(t=>{ if(t.textContent.includes('Actividad')) t.style.display='none'; });
   // Mostrar badge solo lectura
@@ -637,6 +673,7 @@ onAuthStateChanged(auth, (fbUser) => {
     USER_ACTUAL = {id:u, nombre:meta.nombre, rol:meta.rol};
     document.getElementById('login-screen').style.display='none';
     document.getElementById('hdr-user').textContent = USER_ACTUAL.nombre;
+    listenComunicados();
     if(USER_ACTUAL.rol==='consulta'){
       setTimeout(aplicarModoConsulta, 500);
     } else {
@@ -685,6 +722,179 @@ function listenActividad(){
     }).join('');
   });
 }
+
+// ── ESTADO DE CAJA ──
+// Semilla histórica: cierre de mayo 2026, tomado tal cual de la Rendición de
+// Cuentas Junio 2026 ("Saldo anterior 31/05/2026"). A partir de acá todo se
+// calcula solo con lo que ya carga la app (cobros/egresos), salvo el
+// rendimiento que paga Lemon y el efectivo en resguardo, que no se pueden
+// leer de ningún lado del sistema y se cargan a mano una vez por mes.
+const SALDO_CIERRE_HIST = { '2026-05': { ord: 2460393, ext: 9663868 } };
+
+function mesAnteriorDe(mes){
+  const [y,m] = mes.split('-').map(Number);
+  const d = new Date(y, m-2, 1); // m-1 = mes actual (0-index), -1 más = mes anterior
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+function totalesFondos(cobrosArr){
+  let ord=0, ext=0, intOrd=0, intExt=0;
+  cobrosArr.forEach(c=>{
+    const d = desglosarCobro(c);
+    ord += d.capOrd + d.capCargo;
+    ext += d.capExt;
+    intOrd += d.intOrd;
+    intExt += d.intExt;
+  });
+  return {ord, ext, intOrd, intExt};
+}
+
+const _cierreCache = {};
+async function cierreFondo(mes){
+  if(SALDO_CIERRE_HIST[mes]) return SALDO_CIERRE_HIST[mes];
+  if(_cierreCache[mes]) return _cierreCache[mes];
+  const mesAnt = mesAnteriorDe(mes);
+  const anterior = await cierreFondo(mesAnt);
+  const colCobros = 'C_' + mes.replace('-','');
+  const colEgresos = 'E_' + mes.replace('-','');
+  const [snapC, snapE, cajaSnap] = await Promise.all([
+    getDocs(collection(db, colCobros)).catch(()=>({forEach:()=>{}})),
+    getDocs(collection(db, colEgresos)).catch(()=>({forEach:()=>{}})),
+    getDoc(doc(db,'CAJA', mes.replace('-','')))
+  ]);
+  const cobrosArr = []; snapC.forEach(d=>cobrosArr.push(d.data()));
+  const t = totalesFondos(cobrosArr);
+  let egrTotal = 0; snapE.forEach(d=>{ egrTotal += (d.data().m||0); });
+  const rendimiento = cajaSnap.exists() ? (cajaSnap.data().rendimiento_lemon||0) : 0;
+  const resultado = {
+    ord: anterior.ord + t.ord + t.intOrd + rendimiento - egrTotal,
+    ext: anterior.ext + t.ext + t.intExt
+  };
+  _cierreCache[mes] = resultado;
+  return resultado;
+}
+
+async function renderCaja(){
+  const esSemilla = !!SALDO_CIERRE_HIST[MES];
+  document.getElementById('ec-mayo-note').style.display = esSemilla ? 'block' : 'none';
+
+  if(esSemilla){
+    const s = SALDO_CIERRE_HIST[MES];
+    document.getElementById('ec-o-ant').textContent = '—';
+    document.getElementById('ec-o-ing').textContent = '—';
+    document.getElementById('ec-o-int').textContent = '—';
+    document.getElementById('ec-o-lemon').textContent = '—';
+    document.getElementById('ec-o-egr').textContent = '—';
+    document.getElementById('ec-o-cierre').textContent = fa(s.ord);
+    document.getElementById('ec-e-ant').textContent = '—';
+    document.getElementById('ec-e-ing').textContent = '—';
+    document.getElementById('ec-e-int').textContent = '—';
+    document.getElementById('ec-e-cierre').textContent = fa(s.ext);
+    document.getElementById('ec-consolidado').textContent = fa(s.ord+s.ext);
+    document.getElementById('ec-lemon-calc').textContent = '—';
+    document.getElementById('ec-efectivo-calc').textContent = '—';
+    document.getElementById('ec-rend-lemon').value = '';
+    document.getElementById('ec-efectivo').value = '';
+    return;
+  }
+
+  const mesAnt = mesAnteriorDe(MES);
+  const anterior = await cierreFondo(mesAnt);
+  const t = totalesFondos(COBROS);
+  const egrTotal = EGRESOS.reduce((s,e)=>s+(e.m||0),0);
+
+  const cajaSnap = await getDoc(doc(db,'CAJA', MES.replace('-','')));
+  const caja = cajaSnap.exists() ? cajaSnap.data() : {};
+  const rendimiento = caja.rendimiento_lemon || 0;
+  let efectivo = caja.efectivo_resguardo;
+  if(efectivo===undefined || efectivo===null){
+    // Rollforward automático: si no se cargó este mes, se mantiene el del mes anterior
+    const cajaAntSnap = await getDoc(doc(db,'CAJA', mesAnt.replace('-','')));
+    efectivo = cajaAntSnap.exists() ? (cajaAntSnap.data().efectivo_resguardo||0) : 0;
+  }
+
+  const cierreOrd = anterior.ord + t.ord + t.intOrd + rendimiento - egrTotal;
+  const cierreExt = anterior.ext + t.ext + t.intExt;
+  const consolidado = cierreOrd + cierreExt;
+  const lemon = consolidado - efectivo;
+
+  document.getElementById('ec-o-ant').textContent = fa(anterior.ord);
+  document.getElementById('ec-o-ing').textContent = fa(t.ord);
+  document.getElementById('ec-o-int').textContent = fa(t.intOrd);
+  document.getElementById('ec-o-lemon').textContent = fa(rendimiento);
+  document.getElementById('ec-o-egr').textContent = fa(egrTotal);
+  document.getElementById('ec-o-cierre').textContent = fa(cierreOrd);
+
+  document.getElementById('ec-e-ant').textContent = fa(anterior.ext);
+  document.getElementById('ec-e-ing').textContent = fa(t.ext);
+  document.getElementById('ec-e-int').textContent = fa(t.intExt);
+  document.getElementById('ec-e-cierre').textContent = fa(cierreExt);
+
+  document.getElementById('ec-consolidado').textContent = fa(consolidado);
+  document.getElementById('ec-lemon-calc').textContent = fa(lemon);
+  document.getElementById('ec-efectivo-calc').textContent = fa(efectivo);
+  document.getElementById('ec-rend-lemon').value = rendimiento || '';
+  document.getElementById('ec-efectivo').value = caja.efectivo_resguardo!=null ? caja.efectivo_resguardo : '';
+}
+
+window.guardarCaja = async () => {
+  const rendimiento = parseFloat(document.getElementById('ec-rend-lemon').value) || 0;
+  const efectivoRaw = document.getElementById('ec-efectivo').value;
+  const payload = { rendimiento_lemon: rendimiento };
+  if(efectivoRaw !== '') payload.efectivo_resguardo = parseFloat(efectivoRaw) || 0;
+  await setDoc(doc(db,'CAJA', MES.replace('-','')), payload, {merge:true});
+  delete _cierreCache[MES];
+  toast('💾 Estado de caja guardado');
+  renderCaja();
+};
+
+// ── COMUNICADOS (cartelera interna) ──
+function listenComunicados(){
+  onSnapshot(collection(db,'COMUNICADOS'), snap=>{
+    const items = [];
+    snap.forEach(d=>items.push({...d.data(), _id:d.id}));
+    items.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const el = document.getElementById('com-lista');
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<div class="empty">Sin comunicados</div>'; return; }
+    const esConsulta = USER_ACTUAL && USER_ACTUAL.rol==='consulta';
+    el.innerHTML = items.map(i=>{
+      const f = new Date(i.fecha);
+      const fStr = f.toLocaleDateString('es-AR')+' '+f.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="log-item" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <div style="font-weight:700;color:#14603a;font-size:13px">${i.titulo}</div>
+        <div style="font-size:12px;white-space:pre-wrap">${i.texto}</div>
+        <div class="log-time" style="display:flex;justify-content:space-between;width:100%">
+          <span>👤 ${i.nombre} · ${fStr}</span>
+          ${esConsulta?'':`<span style="color:#e53935;cursor:pointer;font-weight:600" onclick="eliminarComunicado('${i._id}')">Eliminar</span>`}
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+window.agregarComunicado = async () => {
+  const tituloEl = document.getElementById('com-titulo');
+  const textoEl = document.getElementById('com-texto');
+  const titulo = tituloEl.value.trim();
+  const texto = textoEl.value.trim();
+  if(!titulo || !texto){ toast('⚠️ Completá título y texto'); return; }
+  await addDoc(collection(db,'COMUNICADOS'),{
+    titulo, texto,
+    nombre: USER_ACTUAL.nombre,
+    usuario: USER_ACTUAL.id,
+    fecha: new Date().toISOString()
+  });
+  tituloEl.value=''; textoEl.value='';
+  registrarActividad('Publicó un comunicado: '+titulo);
+  toast('📢 Comunicado publicado');
+};
+
+window.eliminarComunicado = async (id) => {
+  if(!confirm('¿Eliminar este comunicado?')) return;
+  await deleteDoc(doc(db,'COMUNICADOS', id));
+  toast('🗑️ Comunicado eliminado');
+};
 
 // 84 lotes base
 const LB=[
@@ -860,6 +1070,7 @@ window.ST = (n,el)=>{
   if(n==='rend') renderRend();
   if(n==='conc') renderConc();
   if(n==='plan') cargarPlanes();
+  if(n==='est') renderCaja();
 };
 
 window.cerrar = id => document.getElementById(id).style.display='none';
@@ -877,7 +1088,7 @@ window.cambiarMes = val => {
   document.getElementById('hdr-p').textContent = 'Cobranzas ' + MES_NOM;
   document.getElementById('rend-tit').textContent = 'Rendición — ' + MES_NOM;
   COBROS = []; EGRESOS = [];
-  renderCob(); renderRend(); renderEgr(); actualizarEstado();
+  renderCob(); renderRend(); renderEgr(); actualizarEstado(); renderCaja();
   setDot(false);
   listenCobros();
   listenEgresos();
@@ -925,6 +1136,7 @@ function listenCobros(){
     poblarRS();
     actualizarEstado();
     renderConc();
+    renderCaja();
     cargarTodosCobros();
     // Auto-numerar recibo
     const nums = COBROS.map(c=>parseInt(c.recibo)).filter(n=>!isNaN(n));
@@ -947,6 +1159,7 @@ function listenEgresos(){
     snap.forEach(d=>{ EGRESOS.push({...d.data(), _id:d.id}); });
     renderEgr();
     actualizarEstado();
+    renderCaja();
   });
 }
 
