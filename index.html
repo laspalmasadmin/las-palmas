@@ -1003,6 +1003,21 @@ function textoOfrecerPlan(b, monto){
   return `Hola ${b.p}, ¿cómo estás?\n\nDesde la administración del Consorcio Barrio Las Palmas notamos que el ${b.l} tiene un pequeño atraso (${fa(monto)}) en las expensas.\n\nSi te resulta más cómodo, te podemos armar un plan de pago en cuotas para regularizarlo sin que se acumulen intereses. Cualquier cosa, quedamos a disposición para conversarlo.\n\nSaludos,\nAdministración Barrio Las Palmas`;
 }
 
+// Registra la última acción de cobranza tomada sobre un lote (Aviso, Oferta
+// de plan, Intimación) para que quede visible en el listado — no bloquea la
+// acción principal si falla el guardado (fire-and-forget).
+function colAccionesCobranza(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'ACCIONES_COBRANZA'; }
+async function registrarAccionCobranza(lote, tipo){
+  try {
+    await setDoc(doc(db, colAccionesCobranza(), lote), {
+      tipo, fecha: new Date().toISOString(),
+      usuario: USER_ACTUAL ? USER_ACTUAL.nombre : ''
+    });
+    if(_ULT_ACCIONES) _ULT_ACCIONES[lote] = {tipo, fecha:new Date().toISOString(), usuario:USER_ACTUAL?USER_ACTUAL.nombre:''};
+    renderGestionCobranza();
+  } catch(e){ console.error('registrarAccionCobranza:', e); }
+}
+
 window.copiarAvisoDeuda = async (n) => {
   const item = _ULT_GC_SEMAFORO.find(x=>x.n===n);
   if(!item) return;
@@ -1011,6 +1026,7 @@ window.copiarAvisoDeuda = async (n) => {
     await navigator.clipboard.writeText(texto);
     toast('📋 Aviso copiado — pegalo en WhatsApp o mail');
   } catch(e){ alert(texto); }
+  registrarAccionCobranza(item.l, 'Aviso');
 };
 
 window.copiarOfrecerPlan = async (n) => {
@@ -1021,6 +1037,7 @@ window.copiarOfrecerPlan = async (n) => {
     await navigator.clipboard.writeText(texto);
     toast('📋 Propuesta de plan copiada — pegalo en WhatsApp o mail');
   } catch(e){ alert(texto); }
+  registrarAccionCobranza(item.l, 'Oferta de plan');
 };
 
 // ── INTIMACIÓN EXTRAJUDICIAL + LIQUIDACIÓN ──
@@ -1224,6 +1241,7 @@ window.generarWordIntimacion = async () => {
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   }
   registrarActividad(`Generó intimación (Word) para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
+  registrarAccionCobranza(liq.loteInfo.l, 'Intimación (Word)');
  } catch(e){
   console.error('generarWordIntimacion:', e);
   alert('❌ Error al generar el Word: ' + e.message);
@@ -1420,6 +1438,7 @@ window.generarPDFIntimacion = () => {
     docPDF.save(filename);
   }
   registrarActividad(`Generó intimación de deuda para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
+  registrarAccionCobranza(liq.loteInfo.l, 'Intimación (PDF)');
  } catch(e){
   console.error('generarPDFIntimacion:', e);
   alert('❌ Error al generar el PDF: ' + e.message);
@@ -1427,10 +1446,19 @@ window.generarPDFIntimacion = () => {
 };
 
 let _ULT_GC_SEMAFORO = [];
+let _ULT_ACCIONES = null;
 async function renderGestionCobranza(){
   const elSem = document.getElementById('gc-semaforo');
   const elVenc = document.getElementById('gc-vencimientos');
   if(!elSem || !elVenc) return;
+
+  if(!_ULT_ACCIONES){
+    _ULT_ACCIONES = {};
+    try {
+      const snapAcc = await getDocs(collection(db, colAccionesCobranza()));
+      snapAcc.forEach(d=>{ _ULT_ACCIONES[d.id] = d.data(); });
+    } catch(e){ console.error('cargar acciones cobranza:', e); }
+  }
 
   const ORD_K = ['oe','ob','or','oa','oy','ju_ord','jul_ord'];
   const EXT_K = ['xr','xa','xy','ju_ext','jul_ext'];
@@ -1467,11 +1495,16 @@ async function renderGestionCobranza(){
       const intimacionBtn = i.meses>=2
         ? `<span style="font-size:11px;color:#c62828;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirIntimacion(${i.n})">⚖️ Intimación</span>`
         : '';
+      const accion = _ULT_ACCIONES[i.l];
+      const accionHtml = accion
+        ? `<div style="font-size:10px;color:#1a7a4a;margin-top:2px">✓ ${accion.tipo} — ${new Date(accion.fecha).toLocaleDateString('es-AR')}${accion.usuario?' ('+accion.usuario+')':''}</div>`
+        : '';
       return `<div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;min-width:60%" onclick="irALoteDesdeBusqueda(${i.n})">
           <span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
           <div><span style="font-size:11px;font-weight:700;color:${color};background:${bg};padding:1px 6px;border-radius:4px">${i.l}</span> ${i.p}
             <div style="font-size:10px;color:#888">${label} de atraso · ${fa(i.deuda)}</div>
+            ${accionHtml}
           </div>
         </div>
         <div style="display:flex;gap:10px;align-items:center">
