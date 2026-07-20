@@ -1949,8 +1949,10 @@ function renderAlertaBajaCobrabilidad(){
     </div>`;
 }
 
+const MEMBRETE_TXT = `🌴 CONSORCIO DE PROPIETARIOS BARRIO LAS PALMAS\nWilliam Cross 3302 · Las Talitas, Tucumán\nAdministradores: Juan Ponce / Walter Vallejo\n\n`;
+
 function textoAviso(b, anterior, actual){
-  return `Estimado/a ${b.p}:\n\nLe recordamos que la cuota de expensas de ${actual.nom} del Consorcio Barrio Las Palmas (${b.l}) figura pendiente de pago, ya que registramos su último pago en ${anterior.nom}.\n\nLe solicitamos regularizar la situación a la brevedad para evitar la generación de intereses por mora.\n\nAnte cualquier consulta, quedamos a disposición.\n\nAdministración Barrio Las Palmas`;
+  return `${MEMBRETE_TXT}Estimado/a ${b.p}:\n\nLe recordamos que la cuota de expensas de ${actual.nom} del Consorcio Barrio Las Palmas (${b.l}) figura pendiente de pago, ya que registramos su último pago en ${anterior.nom}.\n\nLe solicitamos regularizar la situación a la brevedad para evitar la generación de intereses por mora.\n\nAnte cualquier consulta, quedamos a disposición.\n\nAdministración Barrio Las Palmas`;
 }
 
 window.copiarAvisoLote = async (n) => {
@@ -1970,7 +1972,7 @@ window.copiarAvisoTodos = async () => {
   const { faltantes, anterior, actual } = _ULT_FALTANTES;
   if(!faltantes.length) return;
   const listado = faltantes.map(b=>`• ${b.l} — ${b.p}`).join('\n');
-  const texto = `Deudores de ${actual.nom} que sí pagaron ${anterior.nom} — Consorcio Barrio Las Palmas:\n\n${listado}\n\nSe les solicita regularizar el pago a la brevedad para evitar intereses por mora.`;
+  const texto = `${MEMBRETE_TXT}Deudores de ${actual.nom} que sí pagaron ${anterior.nom}:\n\n${listado}\n\nSe les solicita regularizar el pago a la brevedad para evitar intereses por mora.`;
   try {
     await navigator.clipboard.writeText(texto);
     toast('📋 Listado copiado — pegalo donde lo necesites');
