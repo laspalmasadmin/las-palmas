@@ -1665,8 +1665,10 @@ async function renderGestionCobranza(){
     elSem.innerHTML = '<div class="empty">Ningún lote con deuda 🎉</div>';
   } else {
     elSem.innerHTML = items.map(i=>{
-      const color = i.meses>=2 ? '#e53935' : '#f9a825';
-      const bg = i.meses>=2 ? '#ffebee' : '#fff8e1';
+      const accion = _ULT_ACCIONES[i.l];
+      const yaGestionado = !!accion;
+      const color = yaGestionado ? '#6a1b9a' : (i.meses>=2 ? '#e53935' : '#f9a825');
+      const bg = yaGestionado ? '#f3e5f5' : (i.meses>=2 ? '#ffebee' : '#fff8e1');
       const label = i.meses>=2 ? `${i.meses} meses` : '1 mes';
       const ofrecerPlanBtn = i.meses===1
         ? `<span style="font-size:11px;color:#1a7a4a;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarOfrecerPlan(${i.n})">📋 Ofrecer plan</span>`
@@ -1674,11 +1676,13 @@ async function renderGestionCobranza(){
       const intimacionBtn = i.meses>=2
         ? `<span style="font-size:11px;color:#c62828;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirIntimacion(${i.n})">⚖️ Intimación</span>`
         : '';
-      const accion = _ULT_ACCIONES[i.l];
       const accionHtml = accion
-        ? `<div style="font-size:10px;color:#1a7a4a;margin-top:2px">✓ ${accion.tipo} — ${new Date(accion.fecha).toLocaleDateString('es-AR')}${accion.usuario?' ('+accion.usuario+')':''}</div>`
+        ? `<div style="font-size:10px;color:#6a1b9a;font-weight:700;margin-top:2px">✓ ${accion.tipo} — ${new Date(accion.fecha).toLocaleDateString('es-AR')}${accion.usuario?' ('+accion.usuario+')':''}</div>`
         : '';
-      return `<div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+      const rowStyle = yaGestionado
+        ? 'display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;background:#faf5fc;border-left:3px solid #6a1b9a;padding-left:6px;border-radius:6px'
+        : 'display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap';
+      return `<div class="log-item" style="${rowStyle}">
         <div style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;min-width:60%" onclick="irALoteDesdeBusqueda(${i.n})">
           <span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
           <div><span style="font-size:11px;font-weight:700;color:${color};background:${bg};padding:1px 6px;border-radius:4px">${i.l}</span> ${i.p}
