@@ -1030,27 +1030,20 @@ window.copiarOfrecerPlan = async (n) => {
 function calcularLiquidacionLote(n){
   const loteInfo = LB.find(x=>x.n===n);
   if(!loteInfo) return null;
-  const dRaw = DEU.find(x=>x.l===loteInfo.l);
-  if(!dRaw) return null;
-  const d = calcDeudaEfectiva(dRaw);
   const fc = new Date(); fc.setHours(23,59,59);
-  const td = 0.04/30;
-  let capOrd=0,intOrd=0,capExt=0,intExt=0;
-  const periodos = [];
-  MI.forEach(m=>{
-    if(fc<m.venc) return;
-    const cO=d[m.co]||0, cX=d[m.cx]||0;
-    if(!cO&&!cX) return;
-    const dias=Math.floor((fc-m.venc)/86400000);
-    const esMesCurso = fc.getFullYear()===m.venc.getFullYear() && fc.getMonth()===m.venc.getMonth();
-    const iO=cO?(esMesCurso?Math.round(cO*0.04):Math.round(cO*td*dias)):0;
-    const iX=cX?(esMesCurso?Math.round(cX*0.04):Math.round(cX*td*dias)):0;
-    capOrd+=cO; intOrd+=iO; capExt+=cX; intExt+=iX;
-    const diasLabel = esMesCurso ? `${dias} días desde el 15` : `${dias} días desde el 15`;
-    periodos.push({mes:m.mes, diasLabel, cO, iO, cX, iX});
+  const r = calcularLiquidacionParaLote(loteInfo.l, loteInfo.p, fc);
+  if(!r) return null;
+  // Reagrupar periodosBreak (una entrada por concepto) en periodos por mes
+  // (cO/iO/cX/iX juntos), para el armado del PDF/Word — mismos números que
+  // ya calcula "Calcular intereses", solo reacomodados para la tabla.
+  const porMes = {};
+  r.periodosBreak.forEach(p=>{
+    if(!porMes[p.mes]) porMes[p.mes] = {mes:p.mes, diasLabel:p.diasLabel, cO:0, iO:0, cX:0, iX:0};
+    if(p.tipo==='ordinaria'){ porMes[p.mes].cO = p.cap; porMes[p.mes].iO = p.int; }
+    else { porMes[p.mes].cX = p.cap; porMes[p.mes].iX = p.int; }
   });
-  const totOrd = capOrd+intOrd, totExt = capExt+intExt, totGen = totOrd+totExt;
-  return {loteInfo, periodos, capOrd, intOrd, capExt, intExt, totOrd, totExt, totGen, fc};
+  const periodos = MI.filter(m=>porMes[m.mes]).map(m=>porMes[m.mes]);
+  return {loteInfo, periodos, capOrd:r.capOrd, intOrd:r.intOrd, capExt:r.capExt, intExt:r.intExt, totOrd:r.totOrd, totExt:r.totExt, totGen:r.totGen, fc};
 }
 
 let _ULT_INTIMACION = null;
@@ -3078,21 +3071,18 @@ window.calcTodos=()=>{
     </div>${rows}`;
 };
 
-window.calcLote=()=>{
-  const sel=document.getElementById('int-lote').value;
-  if(!sel){toast('⚠️ Seleccioná un lote');return;}
-  const fc=new Date(document.getElementById('int-f2').value);
-  if(!fc||isNaN(fc)){toast('⚠️ Ingresá fecha');return;}
-  fc.setHours(23,59,59);
-  const[lote,prop]=sel.split('|');
-  const dRaw=DEU.find(x=>x.l===lote);
-  if(!dRaw){toast('No encontrado');return;}
+// Cálculo de liquidación para un lote a una fecha de corte dada — fuente
+// única de verdad, usada tanto por "Calcular intereses" (calcLote) como por
+// el generador de intimaciones, para que los números sean siempre idénticos
+// a los que ya muestra la app.
+function calcularLiquidacionParaLote(lote, prop, fc){
+  const dRaw = DEU.find(x=>x.l===lote);
+  if(!dRaw) return null;
   const d = calcDeudaEfectiva(dRaw);
-  const td=0.04/30;
-
+  const td = 0.04/30;
   let capOrd=0,intOrd=0,capExt=0,intExt=0;
   let filas='';
-
+  const periodosBreak=[];
   MI.forEach(m=>{
     if(fc<m.venc) return;
     const cO=d[m.co]||0, cX=d[m.cx]||0;
@@ -3105,6 +3095,9 @@ window.calcLote=()=>{
     const iX=cX?(esMesCurso?Math.round(cX*0.04):Math.round(cX*td*dias)):0;
     capOrd+=cO; intOrd+=iO;
     capExt+=cX; intExt+=iX;
+    const diasLabel = esMesCurso ? '4% mensual fijo' : `${dias} días desde el 15`;
+    if(cO) periodosBreak.push({campo:m.co, tipo:'ordinaria', mes:m.mes, diasLabel, cap:cO, int:iO});
+    if(cX) periodosBreak.push({campo:m.cx, tipo:'extraordinaria', mes:m.mes, diasLabel, cap:cX, int:iX});
     const labelPer = esMesCurso ? '(4% mensual fijo)' : `(${dias} días desde el 15)`;
     filas+=`<div style="border-bottom:.5px solid #f0f0f0;padding:8px 0">
       <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">${m.mes} <span style="font-size:10px;color:#aaa">${labelPer}</span></div>
@@ -3118,36 +3111,24 @@ window.calcLote=()=>{
       </div>`:''}
     </div>`;
   });
-
-  const totOrd=capOrd+intOrd;
-  const totExt=capExt+intExt;
-  const totGen=totOrd+totExt;
-
-  // Desglose por período (para prellenar "Generar cobro" con los mismos valores
-  // que se liquidaron acá, sin tener que retipear nada)
-  const periodosBreak=[];
-  MI.forEach(m=>{
-    if(fc<m.venc) return;
-    const cO=d[m.co]||0, cX=d[m.cx]||0;
-    if(cO){
-      const dias=Math.floor((fc-m.venc)/86400000);
-      const fcDate=new Date(fc), vencDate=new Date(m.venc);
-      const esMesCurso=fcDate.getFullYear()===vencDate.getFullYear()&&fcDate.getMonth()===vencDate.getMonth();
-      const iO=esMesCurso?Math.round(cO*0.04):Math.round(cO*(0.04/30)*dias);
-      periodosBreak.push({campo:m.co, tipo:'ordinaria', cap:cO, int:iO});
-    }
-    if(cX){
-      const dias=Math.floor((fc-m.venc)/86400000);
-      const fcDate=new Date(fc), vencDate=new Date(m.venc);
-      const esMesCurso=fcDate.getFullYear()===vencDate.getFullYear()&&fcDate.getMonth()===vencDate.getMonth();
-      const iX=esMesCurso?Math.round(cX*0.04):Math.round(cX*(0.04/30)*dias);
-      periodosBreak.push({campo:m.cx, tipo:'extraordinaria', cap:cX, int:iX});
-    }
-  });
+  const totOrd = capOrd+intOrd, totExt = capExt+intExt, totGen = totOrd+totExt;
   const loteN = (LB.find(x=>x.l===lote)||{}).n;
+  return {...d, lote, prop, fc, filas, capOrd, intOrd, capExt, intExt, totOrd, totExt, totGen, periodosBreak, loteN};
+}
+
+window.calcLote=()=>{
+  const sel=document.getElementById('int-lote').value;
+  if(!sel){toast('⚠️ Seleccioná un lote');return;}
+  const fc=new Date(document.getElementById('int-f2').value);
+  if(!fc||isNaN(fc)){toast('⚠️ Ingresá fecha');return;}
+  fc.setHours(23,59,59);
+  const[lote,prop]=sel.split('|');
+  const res = calcularLiquidacionParaLote(lote, prop, fc);
+  if(!res){toast('No encontrado');return;}
+  const {filas, capOrd, intOrd, capExt, intExt, totOrd, totExt, totGen, periodosBreak, loteN} = res;
 
   // Guardar datos para imprimir / generar cobro
-  window._ultimoLote={...d, lote,prop,fc,filas,capOrd,intOrd,capExt,intExt,totOrd,totExt,totGen,periodosBreak,loteN};
+  window._ultimoLote={...res};
 
   document.getElementById('int-res').innerHTML=`
     <div class="lc pag" style="margin-top:8px">
