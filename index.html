@@ -1018,6 +1018,16 @@ async function registrarAccionCobranza(lote, tipo){
   } catch(e){ console.error('registrarAccionCobranza:', e); }
 }
 
+// Nota manual: para cuando la gestión fue por fuera de la app (llamada,
+// charla personal, WhatsApp directo) y quieren dejarla igual registrada.
+window.registrarAccionManual = (n) => {
+  const item = _ULT_GC_SEMAFORO.find(x=>x.n===n);
+  if(!item) return;
+  const texto = prompt(`Nota para ${item.l} (${item.p}):`, '');
+  if(!texto) return;
+  registrarAccionCobranza(item.l, texto.trim());
+};
+
 window.copiarAvisoDeuda = async (n) => {
   const item = _ULT_GC_SEMAFORO.find(x=>x.n===n);
   if(!item) return;
@@ -1511,6 +1521,7 @@ async function renderGestionCobranza(){
           ${ofrecerPlanBtn}
           ${intimacionBtn}
           <span style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarAvisoDeuda(${i.n})">📋 Aviso</span>
+          <span style="font-size:11px;color:#888;font-weight:700;cursor:pointer;white-space:nowrap" onclick="registrarAccionManual(${i.n})">✏️ Nota</span>
         </div>
       </div>`;
     }).join('');
