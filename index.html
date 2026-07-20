@@ -244,6 +244,19 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 </div>
 
+<div class="modal" id="mod-intimacion">
+  <div class="mbox">
+    <div class="mhdr"><div class="mtit">⚖️ Generar intimación</div><button class="mclose" onclick="cerrar('mod-intimacion')">✕</button></div>
+    <div id="int-info" style="font-size:12px;color:#555;margin-bottom:10px"></div>
+    <div class="fg"><label>Plazo para pagar (horas)</label><input type="number" id="int-plazo" value="48"></div>
+    <div class="fg"><label>Abogado interviniente</label><input type="text" id="int-abogado" value="Silvetti Gustavo Jorge — Abogado M.P. N° 5157"></div>
+    <div class="fg"><label>Dirección del estudio</label><input type="text" id="int-direccion" value="24 de Setiembre nro. 582, quinto piso, oficina A, San Miguel de Tucumán"></div>
+    <div class="fg"><label>Días/horario de atención</label><input type="text" id="int-horario" value="Lunes a viernes de 09.00 a 12.00 horas"></div>
+    <div class="fg"><label>Teléfono / mail de contacto</label><input type="text" id="int-contacto" value="3814052219 (hs. 9 a 12) — gustavosilvetti@hotmail.com"></div>
+    <button class="btn" onclick="generarPDFIntimacion()">📄 Generar PDF</button>
+  </div>
+</div>
+
 <!-- COBRANZAS -->
 <div id="pnl-cob" class="pnl">
   <div id="cob-alerta-recibos"></div>
@@ -1008,6 +1021,222 @@ window.copiarOfrecerPlan = async (n) => {
   } catch(e){ alert(texto); }
 };
 
+// ── INTIMACIÓN EXTRAJUDICIAL + LIQUIDACIÓN ──
+// Misma fórmula de interés punitorio que ya usa "Calcular intereses" (Art. 8:
+// 4% mensual fijo en el mes en curso, prorrateado 4%/30 por día en meses
+// anteriores), aplicada a la fecha de hoy.
+function calcularLiquidacionLote(n){
+  const loteInfo = LB.find(x=>x.n===n);
+  if(!loteInfo) return null;
+  const dRaw = DEU.find(x=>x.l===loteInfo.l);
+  if(!dRaw) return null;
+  const d = calcDeudaEfectiva(dRaw);
+  const fc = new Date(); fc.setHours(23,59,59);
+  const td = 0.04/30;
+  let capOrd=0,intOrd=0,capExt=0,intExt=0;
+  const periodos = [];
+  MI.forEach(m=>{
+    if(fc<m.venc) return;
+    const cO=d[m.co]||0, cX=d[m.cx]||0;
+    if(!cO&&!cX) return;
+    const dias=Math.floor((fc-m.venc)/86400000);
+    const esMesCurso = fc.getFullYear()===m.venc.getFullYear() && fc.getMonth()===m.venc.getMonth();
+    const iO=cO?(esMesCurso?Math.round(cO*0.04):Math.round(cO*td*dias)):0;
+    const iX=cX?(esMesCurso?Math.round(cX*0.04):Math.round(cX*td*dias)):0;
+    capOrd+=cO; intOrd+=iO; capExt+=cX; intExt+=iX;
+    const diasLabel = esMesCurso ? `${dias} días desde el 15` : `${dias} días desde el 15`;
+    periodos.push({mes:m.mes, diasLabel, cO, iO, cX, iX});
+  });
+  const totOrd = capOrd+intOrd, totExt = capExt+intExt, totGen = totOrd+totExt;
+  return {loteInfo, periodos, capOrd, intOrd, capExt, intExt, totOrd, totExt, totGen, fc};
+}
+
+let _ULT_INTIMACION = null;
+window.abrirIntimacion = (n) => {
+  const liq = calcularLiquidacionLote(n);
+  if(!liq || liq.totGen<=0){ toast('⚠️ No hay deuda calculable para este lote'); return; }
+  _ULT_INTIMACION = liq;
+  document.getElementById('int-info').innerHTML =
+    `<b>${liq.loteInfo.l}</b> — ${liq.loteInfo.p}<br>Deuda total al día de hoy: <b style="color:#c62828">${fa(liq.totGen)}</b>`;
+  document.getElementById('mod-intimacion').style.display='block';
+};
+
+window.generarPDFIntimacion = () => {
+  const liq = _ULT_INTIMACION;
+  if(!liq) return;
+  const plazo = document.getElementById('int-plazo').value || '48';
+  const abogado = document.getElementById('int-abogado').value;
+  const direccion = document.getElementById('int-direccion').value;
+  const horario = document.getElementById('int-horario').value;
+  const contacto = document.getElementById('int-contacto').value;
+
+  const { jsPDF } = window.jspdf;
+  const docPDF = new jsPDF({unit:'mm', format:'a4'});
+  const W = docPDF.internal.pageSize.getWidth();
+  const verde=[31,77,61], dorado=[169,133,63];
+
+  // ── Página 1: carta de intimación ──
+  try { docPDF.addImage(LOGO_LAS_PALMAS, 'PNG', W/2-9, 10, 18, 18); } catch(e){}
+  docPDF.setTextColor(...verde); docPDF.setFontSize(15); docPDF.setFont(undefined,'bold');
+  docPDF.text('Bº PRIVADO LAS PALMAS', W/2, 33, {align:'center'});
+  docPDF.setFont(undefined,'normal'); docPDF.setFontSize(9); docPDF.setTextColor(90,90,90);
+  docPDF.text('William Cross Nº 3302 – El Colmenar', W/2, 38, {align:'center'});
+  docPDF.text('Las Talitas - Tucumán', W/2, 42.5, {align:'center'});
+  docPDF.setDrawColor(...dorado); docPDF.line(15, 46, W-15, 46);
+
+  let y = 58;
+  docPDF.setTextColor(30,30,30); docPDF.setFontSize(10);
+  const hoy = new Date().toLocaleDateString('es-AR');
+  docPDF.text(`S. M. de Tucumán, ${hoy}.`, W-15, y, {align:'right'});
+
+  y += 12;
+  docPDF.setFont(undefined,'bold'); docPDF.text('Sra./Sr.', 15, y); y+=5;
+  docPDF.text(liq.loteInfo.p.toUpperCase(), 15, y); y+=5;
+  docPDF.setFont(undefined,'normal'); docPDF.text('Propietarios y/o Inquilinos', 15, y); y+=5;
+  docPDF.setFont(undefined,'bold'); docPDF.text(liq.loteInfo.l.toUpperCase(), 15, y); y+=5;
+  docPDF.setFont(undefined,'normal'); docPDF.text('WILLIAM CROSS 3302', 15, y); y+=5;
+  docPDF.setFont(undefined,'italic'); docPDF.text('Presente/s', 15, y);
+  docPDF.setFont(undefined,'normal');
+
+  y += 12;
+  const cuerpo = `Me dirijo a Ud./es, en el carácter de abogado designado por la Administración del CONSORCIO DE PROPIETARIOS, siguiendo las expresas instrucciones impartidas, a fin de que en virtud de lo establecido por el Reglamento de Copropiedad y Administración y CCyCN, se pone en conocimiento "con carácter previo a juicio" que la Unidad Funcional registra la deuda que se detalla en el resumen adjunto al pie de la presente:`;
+  const cuerpoLines = docPDF.splitTextToSize(cuerpo, W-30);
+  docPDF.text(cuerpoLines, 15, y);
+  y += cuerpoLines.length*5 + 8;
+
+  docPDF.setFont(undefined,'normal');
+  docPDF.text(`Por la suma de `, 15, y);
+  docPDF.setFont(undefined,'bold');
+  docPDF.text(`${fa(liq.totGen)}`, 15+docPDF.getTextWidth('Por la suma de '), y);
+  docPDF.setFont(undefined,'normal');
+  const restoLinea = `, a lo que se deberán adicionar los honorarios profesionales, y a cuyo pago se le intima por el término de ${plazo} horas.`;
+  const restoLines = docPDF.splitTextToSize(restoLinea, W-30-docPDF.getTextWidth(`Por la suma de ${fa(liq.totGen)}`));
+  docPDF.text(restoLines, 15+docPDF.getTextWidth(`Por la suma de ${fa(liq.totGen)}`), y);
+  y += Math.max(restoLines.length,1)*5 + 10;
+
+  docPDF.setFont(undefined,'bold');
+  const pagoLinea = docPDF.splitTextToSize(`El pago deberá ser efectuado en el domicilio de este Estudio Jurídico, sito en calle ${direccion} (días de atención: ${horario}).`, W-30);
+  docPDF.text(pagoLinea, 15, y);
+  y += pagoLinea.length*5 + 10;
+
+  docPDF.setFont(undefined,'normal');
+  const contactoLinea = docPDF.splitTextToSize(`En caso de no poder dar cumplimiento con la intimación cursada podrá comunicarse, dentro del plazo concedido, al ${contacto}, a los efectos de formalizar un acuerdo de pago, caso contrario se iniciará de inmediato la correspondiente ejecución judicial, con la traba de embargo sobre la propiedad.`, W-30);
+  docPDF.text(contactoLinea, 15, y);
+  y += contactoLinea.length*5 + 16;
+
+  docPDF.text('Saludo a Usted Atte.-', W-15, y, {align:'right'});
+  y += 20;
+  const abogadoLines = abogado.split(' — ');
+  docPDF.setFont(undefined,'bold');
+  docPDF.text(abogadoLines[0]||abogado, W-15, y, {align:'right'}); y+=5;
+  docPDF.setFont(undefined,'normal');
+  if(abogadoLines[1]) docPDF.text(abogadoLines[1], W-15, y, {align:'right'});
+
+  // ── Página 2: liquidación de deuda ──
+  docPDF.addPage();
+  docPDF.setTextColor(...verde); docPDF.setFontSize(13); docPDF.setFont(undefined,'bold');
+  docPDF.text('Consorcio de Propietarios Barrio Las Palmas', 15, 18);
+  docPDF.setFont(undefined,'normal'); docPDF.setFontSize(8); docPDF.setTextColor(100,100,100);
+  docPDF.text('Domicilio: William Cross 3302 · Administradores: Juan Ponce / Walter Vallejo · Tel: 3814097776 / 3815995289', 15, 23);
+
+  let y2 = 34;
+  docPDF.setFontSize(11); docPDF.setTextColor(120,120,120);
+  docPDF.text('Liquidación de deuda con intereses punitorios', 15, y2);
+  y2 += 6;
+  docPDF.setFontSize(8.5); docPDF.setTextColor(140,140,140);
+  docPDF.text(`${liq.loteInfo.l} — ${liq.loteInfo.p} · Al ${liq.fc.toLocaleDateString('es-AR')} · Art. 8 Reglamento · Tasa 4% mensual`, 15, y2);
+  y2 += 8;
+
+  docPDF.setDrawColor(220,220,220); docPDF.line(15, y2, W-15, y2); y2 += 6;
+  docPDF.setFontSize(8); docPDF.setTextColor(90,90,90); docPDF.setFont(undefined,'bold');
+  docPDF.text('Período / Tipo', 15, y2);
+  docPDF.text('Capital', W-75, y2, {align:'right'});
+  docPDF.text('Interés', W-45, y2, {align:'right'});
+  docPDF.text('Subtotal', W-15, y2, {align:'right'});
+  docPDF.setFont(undefined,'normal');
+  y2 += 5;
+  docPDF.setDrawColor(220,220,220); docPDF.line(15, y2, W-15, y2); y2 += 5;
+
+  liq.periodos.forEach(p=>{
+    docPDF.setFontSize(8.5); docPDF.setTextColor(60,60,60); docPDF.setFont(undefined,'bold');
+    docPDF.text(`${p.mes} (${p.diasLabel})`, 15, y2);
+    docPDF.setFont(undefined,'normal');
+    y2 += 5;
+    if(p.cO){
+      docPDF.setTextColor(21,101,192);
+      docPDF.text('Exp. Ordinaria', 18, y2);
+      docPDF.setTextColor(30,30,30);
+      docPDF.text(fa(p.cO), W-75, y2, {align:'right'});
+      docPDF.setTextColor(229,57,53);
+      docPDF.text(fa(p.iO), W-45, y2, {align:'right'});
+      docPDF.setTextColor(30,30,30);
+      docPDF.text(fa(p.cO+p.iO), W-15, y2, {align:'right'});
+      y2 += 5;
+    }
+    if(p.cX){
+      docPDF.setTextColor(26,122,74);
+      docPDF.text('Exp. Extraordinaria', 18, y2);
+      docPDF.setTextColor(30,30,30);
+      docPDF.text(fa(p.cX), W-75, y2, {align:'right'});
+      docPDF.setTextColor(229,57,53);
+      docPDF.text(fa(p.iX), W-45, y2, {align:'right'});
+      docPDF.setTextColor(30,30,30);
+      docPDF.text(fa(p.cX+p.iX), W-15, y2, {align:'right'});
+      y2 += 5;
+    }
+    y2 += 2;
+  });
+
+  docPDF.setDrawColor(200,200,200); docPDF.line(15, y2, W-15, y2); y2 += 6;
+  docPDF.setFont(undefined,'bold'); docPDF.setFontSize(9); docPDF.setTextColor(30,30,30);
+  docPDF.text('Subtotal Exp. Ordinaria', 15, y2);
+  docPDF.text(fa(liq.capOrd), W-75, y2, {align:'right'});
+  docPDF.setTextColor(229,57,53); docPDF.text(fa(liq.intOrd), W-45, y2, {align:'right'});
+  docPDF.setTextColor(30,30,30); docPDF.text(fa(liq.totOrd), W-15, y2, {align:'right'});
+  y2 += 6;
+  docPDF.text('Subtotal Exp. Extraordinaria', 15, y2);
+  docPDF.text(fa(liq.capExt), W-75, y2, {align:'right'});
+  docPDF.setTextColor(229,57,53); docPDF.text(fa(liq.intExt), W-45, y2, {align:'right'});
+  docPDF.setTextColor(30,30,30); docPDF.text(fa(liq.totExt), W-15, y2, {align:'right'});
+  y2 += 8;
+
+  docPDF.setFontSize(11); docPDF.setTextColor(120,120,120);
+  docPDF.text('TOTAL A COBRAR', 15, y2);
+  docPDF.setTextColor(30,30,30);
+  docPDF.text(fa(liq.totOrd+liq.totExt), W-15, y2, {align:'right'});
+  docPDF.setFont(undefined,'normal');
+
+  y2 += 10;
+  docPDF.setDrawColor(229,57,53);
+  docPDF.roundedRect(15, y2, W-30, 10, 2, 2, 'S');
+  docPDF.setFontSize(8); docPDF.setTextColor(198,40,40);
+  docPDF.text('⚠ El presente cálculo está SUJETO A VERIFICACIÓN', W/2, y2+6.5, {align:'center'});
+  y2 += 18;
+
+  docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
+  docPDF.text('Art. 8 Reglamento de Copropiedad · Tasa punitoria: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes', W/2, y2, {align:'center'});
+  y2 += 22;
+
+  docPDF.setDrawColor(150,150,150);
+  docPDF.line(15, y2, 85, y2);
+  docPDF.line(W-85, y2, W-15, y2);
+  y2 += 5;
+  docPDF.setFontSize(8.5); docPDF.setTextColor(30,30,30);
+  docPDF.text('Juan Ponce / Walter Vallejo', 50, y2, {align:'center'});
+  docPDF.text('Juana B. Varvaro', W-50, y2, {align:'center'});
+  y2 += 4;
+  docPDF.setFontSize(7); docPDF.setTextColor(110,110,110);
+  docPDF.text('Administradores', 50, y2, {align:'center'});
+  docPDF.text('Contadora Pública · M.P 7450 - C.G.C.E.T.', W-50, y2, {align:'center'});
+  y2 += 8;
+  docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
+  docPDF.text(`Generado el ${new Date().toLocaleDateString('es-AR')} · Consorcio Barrio Las Palmas · William Cross 3302`, W/2, y2, {align:'center'});
+
+  cerrar('mod-intimacion');
+  imprimirPDF(docPDF);
+  registrarActividad(`Generó intimación de deuda para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
+};
+
 let _ULT_GC_SEMAFORO = [];
 async function renderGestionCobranza(){
   const elSem = document.getElementById('gc-semaforo');
@@ -1046,6 +1275,9 @@ async function renderGestionCobranza(){
       const ofrecerPlanBtn = i.meses===1
         ? `<span style="font-size:11px;color:#1a7a4a;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarOfrecerPlan(${i.n})">📋 Ofrecer plan</span>`
         : '';
+      const intimacionBtn = i.meses>=2
+        ? `<span style="font-size:11px;color:#c62828;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirIntimacion(${i.n})">⚖️ Intimación</span>`
+        : '';
       return `<div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;min-width:60%" onclick="irALoteDesdeBusqueda(${i.n})">
           <span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
@@ -1055,6 +1287,7 @@ async function renderGestionCobranza(){
         </div>
         <div style="display:flex;gap:10px;align-items:center">
           ${ofrecerPlanBtn}
+          ${intimacionBtn}
           <span style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarAvisoDeuda(${i.n})">📋 Aviso</span>
         </div>
       </div>`;
