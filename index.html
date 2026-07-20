@@ -245,6 +245,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 
 <!-- COBRANZAS -->
 <div id="pnl-cob" class="pnl">
+  <div id="cob-alerta-recibos"></div>
   <div class="g2">
     <div class="met"><div class="ml">Lotes con cobros</div><div class="mv vd" id="m-pag">—</div></div>
     <div class="met"><div class="ml">Sin cobros</div><div class="mv rj" id="m-pen">—</div></div>
@@ -947,12 +948,40 @@ window.ST = (n,el)=>{
   if(n==='conc') renderConc();
   if(n==='plan') cargarPlanes();
   if(n==='ini') { renderInicio(); renderComparativo(); }
+  if(n==='cob') verificarCorrelatividadRecibos();
 };
 
 window.irATab = (n) => {
   const el = document.querySelector('.tab[data-tab="'+n+'"]');
   if(el) ST(n, el);
 };
+
+// ── CORRELATIVIDAD DE RECIBOS ──
+// Chequea que la numeración de RECIBOS no tenga saltos (recibos que nunca
+// se generaron/guardaron). Los anulados SÍ cuentan como existentes —
+// conservan su número, así que no aparecen como falta.
+async function verificarCorrelatividadRecibos(){
+  const el = document.getElementById('cob-alerta-recibos');
+  if(!el) return;
+  try {
+    const snap = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
+    const nums = [];
+    snap.forEach(d=>{ const n = parseInt(d.data().recibo); if(!isNaN(n)) nums.push(n); });
+    if(nums.length < 2){ el.innerHTML=''; return; }
+    nums.sort((a,b)=>a-b);
+    const set = new Set(nums);
+    const faltantes = [];
+    for(let n=nums[0]; n<=nums[nums.length-1]; n++){ if(!set.has(n)) faltantes.push(n); }
+    if(!faltantes.length){ el.innerHTML=''; return; }
+    el.innerHTML = `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
+      <div class="ct" style="color:#e53935">🔴 Salto en la numeración de recibos</div>
+      <div style="font-size:12px">Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
+    </div>`;
+  } catch(e){
+    console.error('verificarCorrelatividadRecibos:', e);
+    el.innerHTML='';
+  }
+}
 
 // ── INICIO (portada / dashboard) ──
 function renderInicio(){
