@@ -1139,26 +1139,31 @@ window.generarWordIntimacion = async () => {
     new D.Paragraph({children:[], pageBreakBefore:true}),
   ];
 
-  // ── Página 2: liquidación (tabla real de Word, editable) ──
+  // ── Página 2: liquidación (tabla real de Word, editable, mismo formato que la app) ──
   const celda = (text, opts={}) => new D.TableCell({
     width:{size:opts.w||25, type:D.WidthType.PERCENTAGE},
+    columnSpan: opts.span,
     shading: opts.shade ? {fill:opts.shade} : undefined,
     margins:{top:80,bottom:80,left:100,right:100},
-    children:[new D.Paragraph({alignment:opts.align||D.AlignmentType.LEFT, children:[new D.TextRun({text, bold:opts.bold, color:opts.color, size:opts.size||18})]})]
+    children:[new D.Paragraph({alignment:opts.align||D.AlignmentType.LEFT, children:[new D.TextRun({text, bold:opts.bold, italics:opts.italics, color:opts.color, size:opts.size||18})]})]
   });
 
   const filasTabla = [
     new D.TableRow({children:[
-      celda('Período / Tipo', {w:40,bold:true,shade:'F0F0F0'}),
-      celda('Capital', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
-      celda('Interés', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
-      celda('Subtotal', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
+      celda('Período / Tipo', {w:40,bold:true,color:'FFFFFF',shade:'1F4D3D'}),
+      celda('Capital', {w:20,bold:true,color:'FFFFFF',shade:'1F4D3D',align:D.AlignmentType.RIGHT}),
+      celda('Interés', {w:20,bold:true,color:'FFFFFF',shade:'1F4D3D',align:D.AlignmentType.RIGHT}),
+      celda('Subtotal', {w:20,bold:true,color:'FFFFFF',shade:'1F4D3D',align:D.AlignmentType.RIGHT}),
     ]})
   ];
   liq.periodos.forEach(per=>{
+    // Fila de encabezado del mes (igual que en el PDF y en la app: "Mes (días desde el 15)")
+    filasTabla.push(new D.TableRow({children:[
+      celda(`${per.mes} (${per.diasLabel})`, {w:100, span:4, bold:true, shade:'F5F5F5', color:'555555'})
+    ]}));
     if(per.cO){
       filasTabla.push(new D.TableRow({children:[
-        celda(`${per.mes} — Exp. Ordinaria (${per.diasLabel})`, {w:40, color:'1565C0'}),
+        celda('   Exp. Ordinaria', {w:40, color:'1565C0'}),
         celda(fa(per.cO), {w:20, align:D.AlignmentType.RIGHT}),
         celda(fa(per.iO), {w:20, align:D.AlignmentType.RIGHT, color:'E53935'}),
         celda(fa(per.cO+per.iO), {w:20, align:D.AlignmentType.RIGHT, bold:true}),
@@ -1166,7 +1171,7 @@ window.generarWordIntimacion = async () => {
     }
     if(per.cX){
       filasTabla.push(new D.TableRow({children:[
-        celda(`${per.mes} — Exp. Extraordinaria (${per.diasLabel})`, {w:40, color:'1A7A4A'}),
+        celda('   Exp. Extraordinaria', {w:40, color:'1A7A4A'}),
         celda(fa(per.cX), {w:20, align:D.AlignmentType.RIGHT}),
         celda(fa(per.iX), {w:20, align:D.AlignmentType.RIGHT, color:'E53935'}),
         celda(fa(per.cX+per.iX), {w:20, align:D.AlignmentType.RIGHT, bold:true}),
