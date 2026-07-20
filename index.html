@@ -1053,17 +1053,23 @@ function calcularLiquidacionLote(n){
 
 let _ULT_INTIMACION = null;
 window.abrirIntimacion = (n) => {
+ try {
   const liq = calcularLiquidacionLote(n);
   if(!liq || liq.totGen<=0){ toast('⚠️ No hay deuda calculable para este lote'); return; }
   _ULT_INTIMACION = liq;
   document.getElementById('int-info').innerHTML =
     `<b>${liq.loteInfo.l}</b> — ${liq.loteInfo.p}<br>Deuda total al día de hoy: <b style="color:#c62828">${fa(liq.totGen)}</b>`;
   document.getElementById('mod-intimacion').style.display='block';
+ } catch(e){
+  console.error('abrirIntimacion:', e);
+  alert('❌ Error al calcular la liquidación: ' + e.message);
+ }
 };
 
 window.generarPDFIntimacion = () => {
+ try {
   const liq = _ULT_INTIMACION;
-  if(!liq) return;
+  if(!liq){ toast('⚠️ Abrí la intimación desde un lote primero'); return; }
   const plazo = document.getElementById('int-plazo').value || '48';
   const abogado = document.getElementById('int-abogado').value;
   const direccion = document.getElementById('int-direccion').value;
@@ -1235,6 +1241,10 @@ window.generarPDFIntimacion = () => {
   cerrar('mod-intimacion');
   imprimirPDF(docPDF);
   registrarActividad(`Generó intimación de deuda para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
+ } catch(e){
+  console.error('generarPDFIntimacion:', e);
+  alert('❌ Error al generar el PDF: ' + e.message);
+ }
 };
 
 let _ULT_GC_SEMAFORO = [];
