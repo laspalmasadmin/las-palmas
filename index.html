@@ -258,6 +258,14 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 </div>
 
+<div class="modal" id="mod-ctacte">
+  <div class="mbox" style="max-width:480px">
+    <div class="mhdr"><div class="mtit">🧾 Cuenta corriente</div><button class="mclose" onclick="cerrar('mod-ctacte')">✕</button></div>
+    <div id="ctacte-body">Cargando...</div>
+    <button class="btn" style="margin-top:10px" onclick="generarPDFCuentaCorriente()">📄 Generar PDF</button>
+  </div>
+</div>
+
 <!-- COBRANZAS -->
 <div id="pnl-cob" class="pnl">
   <div id="cob-alerta-recibos"></div>
@@ -1028,6 +1036,167 @@ window.registrarAccionManual = (n) => {
   registrarAccionCobranza(item.l, texto.trim());
 };
 
+// ── CUENTA CORRIENTE POR LOTE ──
+// Art. 15 inc. j) del Reglamento de Copropiedad y Administración: el
+// Administrador debe "llevar las cuentas corrientes de cada propietario".
+// Se arma con lo que ya carga la app: pagos históricos (TODOS_COBROS) y
+// deuda pendiente actual por período (misma fuente que Deudores).
+let _ULT_CTACTE = null;
+function armarCuentaCorriente(n){
+  const loteInfo = LB.find(x=>x.n===n);
+  if(!loteInfo) return null;
+  const pagos = TODOS_COBROS
+    .filter(c=>parseInt(c.n)===n)
+    .slice()
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const totalPagado = pagos.reduce((s,c)=>s+(c.monto||0),0);
+  const pendientes = getDeudaLotePeriodos(n, 'ambas');
+  const totalPendiente = pendientes.reduce((s,p)=>s+p.monto,0);
+  return {loteInfo, pagos, totalPagado, pendientes, totalPendiente};
+}
+
+window.abrirCuentaCorriente = (n) => {
+  const cc = armarCuentaCorriente(n);
+  const body = document.getElementById('ctacte-body');
+  if(!cc){ body.innerHTML = '<div class="empty">Lote no encontrado</div>'; document.getElementById('mod-ctacte').style.display='block'; return; }
+  _ULT_CTACTE = cc;
+  const filasPagos = cc.pagos.length
+    ? cc.pagos.map(c=>`<div class="log-item" style="font-size:11px">
+        <div><b>${c.fecha||'—'}</b> · ${(c.concepto||c.per||'—')} · Recibo ${c.recibo||'—'}</div>
+        <div style="text-align:right;font-weight:700;color:#1a7a4a">${fa(c.monto||0)}</div>
+      </div>`).join('')
+    : '<div class="empty">Sin pagos registrados</div>';
+  const filasPend = cc.pendientes.length
+    ? cc.pendientes.map(p=>`<div class="log-item" style="font-size:11px"><div>${p.label}</div><div style="text-align:right;font-weight:700;color:#e53935">${fa(p.monto)}</div></div>`).join('')
+    : '<div class="empty" style="color:#1a7a4a">Sin deuda pendiente ✅</div>';
+  body.innerHTML = `
+    <div style="background:#1a7a4a;color:#fff;padding:8px 10px;border-radius:8px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700">${cc.loteInfo.l} — ${cc.loteInfo.p}</div>
+      <div style="font-size:10px;opacity:.85">Cuenta corriente — Art. 15 inc. j) del Reglamento de Copropiedad</div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">💰 Pagos registrados (histórico)</div>
+    ${filasPagos}
+    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;border-top:1px solid #eee;padding:6px 0;margin-bottom:10px">
+      <span>Total pagado</span><span style="color:#1a7a4a">${fa(cc.totalPagado)}</span>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">⚠️ Deuda pendiente actual</div>
+    ${filasPend}
+    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;border-top:1px solid #eee;padding:6px 0">
+      <span>Total pendiente</span><span style="color:#e53935">${fa(cc.totalPendiente)}</span>
+    </div>
+  `;
+  cerrar('mod-buscar');
+  document.getElementById('mod-ctacte').style.display='block';
+};
+
+window.generarPDFCuentaCorriente = () => {
+ try {
+  const cc = _ULT_CTACTE;
+  if(!cc){ toast('⚠️ Abrí la cuenta corriente de un lote primero'); return; }
+  const { jsPDF } = window.jspdf;
+  const docPDF = new jsPDF({unit:'mm', format:'a4'});
+  const W = docPDF.internal.pageSize.getWidth();
+  const verde=[31,77,61], dorado=[169,133,63];
+
+  docPDF.setFillColor(...verde);
+  docPDF.rect(0,0,W,34,'F');
+  try { docPDF.addImage(LOGO_LAS_PALMAS, 'PNG', 12, 5, 24, 24); } catch(e){}
+  const cx = 40 + (W-40)/2;
+  docPDF.setTextColor(255,255,255); docPDF.setFontSize(11);
+  docPDF.text('Consorcio de Propietarios', cx, 10, {align:'center'});
+  docPDF.setTextColor(...dorado); docPDF.setFontSize(15);
+  docPDF.text('Barrio Las Palmas', cx, 17, {align:'center'});
+  docPDF.setTextColor(220,235,228); docPDF.setFontSize(8.5);
+  docPDF.text('Domicilio: William Cross 3302 · Las Talitas, Tucumán', cx, 23.5, {align:'center'});
+  docPDF.text('Administradores: Juan Ponce · Walter Vallejo', cx, 28, {align:'center'});
+
+  let y = 46;
+  docPDF.setTextColor(30,30,30); docPDF.setFontSize(13); docPDF.setFont(undefined,'bold');
+  docPDF.text('Cuenta Corriente de Propietario', 15, y);
+  docPDF.setFont(undefined,'normal'); docPDF.setFontSize(10);
+  y += 8;
+  docPDF.text(`${cc.loteInfo.l} — ${cc.loteInfo.p}`, 15, y);
+  y += 5;
+  docPDF.setFontSize(8); docPDF.setTextColor(120,120,120);
+  docPDF.text(`Emitido el ${new Date().toLocaleDateString('es-AR')} · en cumplimiento del Art. 15 inc. j) del Reglamento de Copropiedad y Administración (Expte. 35/22), que obliga al Administrador a llevar las cuentas corrientes de cada propietario`, 15, y, {maxWidth:W-30});
+  y += 12;
+
+  docPDF.setFontSize(10); docPDF.setTextColor(30,30,30); docPDF.setFont(undefined,'bold');
+  docPDF.text('Pagos registrados', 15, y);
+  docPDF.setFont(undefined,'normal');
+  y += 6;
+  docPDF.setFontSize(8); docPDF.setTextColor(90,90,90);
+  docPDF.text('Fecha', 15, y); docPDF.text('Concepto', 45, y); docPDF.text('Recibo', 130, y); docPDF.text('Monto', W-15, y, {align:'right'});
+  y += 2;
+  docPDF.setDrawColor(220,220,220); docPDF.line(15,y,W-15,y); y += 4;
+
+  if(!cc.pagos.length){
+    docPDF.setTextColor(150,150,150);
+    docPDF.text('Sin pagos registrados', 15, y);
+    y += 6;
+  } else {
+    cc.pagos.forEach(c=>{
+      if(y > 270){ docPDF.addPage(); y = 20; }
+      docPDF.setTextColor(60,60,60); docPDF.setFontSize(8);
+      docPDF.text(c.fecha||'—', 15, y);
+      docPDF.text(String(c.concepto||c.per||'—').slice(0,35), 45, y);
+      docPDF.text(String(c.recibo||'—'), 130, y);
+      docPDF.setTextColor(26,122,74);
+      docPDF.text(fa(c.monto||0), W-15, y, {align:'right'});
+      y += 5;
+    });
+  }
+  y += 3;
+  docPDF.setDrawColor(200,200,200); docPDF.line(15,y,W-15,y); y += 6;
+  docPDF.setFontSize(10); docPDF.setFont(undefined,'bold'); docPDF.setTextColor(30,30,30);
+  docPDF.text('Total pagado', 15, y);
+  docPDF.setTextColor(...verde);
+  docPDF.text(fa(cc.totalPagado), W-15, y, {align:'right'});
+  docPDF.setFont(undefined,'normal');
+  y += 14;
+
+  if(y > 250){ docPDF.addPage(); y = 20; }
+  docPDF.setFontSize(10); docPDF.setTextColor(30,30,30); docPDF.setFont(undefined,'bold');
+  docPDF.text('Deuda pendiente actual', 15, y);
+  docPDF.setFont(undefined,'normal');
+  y += 7;
+  if(!cc.pendientes.length){
+    docPDF.setFontSize(9); docPDF.setTextColor(...verde);
+    docPDF.text('Sin deuda pendiente ✅', 15, y);
+    y += 6;
+  } else {
+    cc.pendientes.forEach(p=>{
+      if(y > 270){ docPDF.addPage(); y = 20; }
+      docPDF.setFontSize(8.5); docPDF.setTextColor(60,60,60);
+      docPDF.text(p.label, 15, y);
+      docPDF.setTextColor(229,57,53);
+      docPDF.text(fa(p.monto), W-15, y, {align:'right'});
+      y += 5;
+    });
+  }
+  y += 3;
+  docPDF.setDrawColor(200,200,200); docPDF.line(15,y,W-15,y); y += 6;
+  docPDF.setFontSize(10); docPDF.setFont(undefined,'bold'); docPDF.setTextColor(30,30,30);
+  docPDF.text('Total pendiente', 15, y);
+  docPDF.setTextColor(229,57,53);
+  docPDF.text(fa(cc.totalPendiente), W-15, y, {align:'right'});
+  docPDF.setFont(undefined,'normal');
+
+  const filename = `Cuenta_Corriente_${cc.loteInfo.l.replace(/\s+/g,'_')}.pdf`;
+  const blob = docPDF.output('blob');
+  const file = new File([blob], filename, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:'Cuenta corriente '+cc.loteInfo.l}).catch(()=>{ docPDF.save(filename); });
+  } else {
+    docPDF.save(filename);
+  }
+  registrarActividad(`Generó cuenta corriente de ${cc.loteInfo.l} (${cc.loteInfo.p})`);
+ } catch(e){
+  console.error('generarPDFCuentaCorriente:', e);
+  alert('❌ Error al generar el PDF: ' + e.message);
+ }
+};
+
 window.copiarAvisoDeuda = async (n) => {
   const item = _ULT_GC_SEMAFORO.find(x=>x.n===n);
   if(!item) return;
@@ -1639,8 +1808,9 @@ window.buscarGlobal = (v) => {
   const matches = LB.filter(b=>b.l.toLowerCase().includes(q)||b.p.toLowerCase().includes(q)).slice(0,15);
   if(!matches.length){ el.innerHTML='<div class="empty">Sin resultados</div>'; return; }
   el.innerHTML = matches.map(b=>`
-    <div class="log-item" style="cursor:pointer" onclick="irALoteDesdeBusqueda(${b.n})">
-      <div><span style="font-size:11px;font-weight:700;color:#14603a;background:#e8f5ee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+    <div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+      <div style="cursor:pointer;flex:1" onclick="irALoteDesdeBusqueda(${b.n})"><span style="font-size:11px;font-weight:700;color:#14603a;background:#e8f5ee;padding:1px 6px;border-radius:4px">${b.l}</span> ${b.p}</div>
+      <span style="font-size:11px;color:#6a1b9a;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirCuentaCorriente(${b.n})">🧾 Cta. Cte.</span>
     </div>`).join('');
 };
 
