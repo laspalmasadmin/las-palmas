@@ -1239,7 +1239,15 @@ window.generarPDFIntimacion = () => {
   docPDF.text(`Generado el ${new Date().toLocaleDateString('es-AR')} · Consorcio Barrio Las Palmas · William Cross 3302`, W/2, y2, {align:'center'});
 
   cerrar('mod-intimacion');
-  imprimirPDF(docPDF);
+  const filename = `Intimacion_${liq.loteInfo.l.replace(/\s+/g,'_')}.pdf`;
+  const blob = docPDF.output('blob');
+  const file = new File([blob], filename, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:'Intimación '+liq.loteInfo.l})
+      .catch(()=>{ docPDF.save(filename); });
+  } else {
+    docPDF.save(filename);
+  }
   registrarActividad(`Generó intimación de deuda para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
  } catch(e){
   console.error('generarPDFIntimacion:', e);
