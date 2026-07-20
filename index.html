@@ -969,16 +969,24 @@ async function verificarCorrelatividadRecibos(){
     const snap = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
     const nums = [];
     snap.forEach(d=>{ const n = parseInt(d.data().recibo); if(!isNaN(n)) nums.push(n); });
-    if(nums.length < 2){ els.forEach(el=>el.innerHTML=''); return; }
+    if(nums.length < 1){ els.forEach(el=>el.innerHTML=''); return; }
     nums.sort((a,b)=>a-b);
+    const min = nums[0], max = nums[nums.length-1];
     const set = new Set(nums);
     const faltantes = [];
-    for(let n=nums[0]; n<=nums[nums.length-1]; n++){ if(!set.has(n)) faltantes.push(n); }
-    if(!faltantes.length){ els.forEach(el=>el.innerHTML=''); return; }
-    const html = `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
-      <div class="ct" style="color:#e53935">🔴 Salto en la numeración de recibos</div>
-      <div style="font-size:12px">Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
-    </div>`;
+    for(let n=min; n<=max; n++){ if(!set.has(n)) faltantes.push(n); }
+    let html;
+    if(faltantes.length){
+      html = `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
+        <div class="ct" style="color:#e53935">🔴 Salto en la numeración de recibos</div>
+        <div style="font-size:12px">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos). Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
+      </div>`;
+    } else {
+      html = `<div class="card" style="border:1px solid #1a7a4a;background:#f2f9f5;margin-bottom:10px">
+        <div class="ct" style="color:#1a7a4a">✅ Numeración de recibos correlativa</div>
+        <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos), sin saltos.</div>
+      </div>`;
+    }
     els.forEach(el=>el.innerHTML=html);
   } catch(e){
     console.error('verificarCorrelatividadRecibos:', e);
