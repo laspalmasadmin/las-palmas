@@ -253,6 +253,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg"><label>Dirección del estudio</label><input type="text" id="int-direccion" value="24 de Setiembre nro. 582, quinto piso, oficina A, San Miguel de Tucumán"></div>
     <div class="fg"><label>Días/horario de atención</label><input type="text" id="int-horario" value="Lunes a viernes de 09.00 a 12.00 horas"></div>
     <div class="fg"><label>Teléfono / mail de contacto</label><input type="text" id="int-contacto" value="3814052219 (hs. 9 a 12) — gustavosilvetti@hotmail.com"></div>
+    <button class="btn" style="background:#fff;border:1px solid #1a7a4a;color:#1a7a4a;margin-bottom:8px" onclick="generarWordIntimacion()">📝 Generar Word (editable)</button>
     <button class="btn" onclick="generarPDFIntimacion()">📄 Generar PDF</button>
   </div>
 </div>
@@ -690,6 +691,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1066,6 +1068,170 @@ window.abrirIntimacion = (n) => {
  }
 };
 
+// Convierte un data URI base64 a Uint8Array (para insertar el logo como imagen en el Word)
+function _dataUriABytes(dataUri){
+  const base64 = dataUri.split(',')[1];
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+window.generarWordIntimacion = async () => {
+ try {
+  const liq = _ULT_INTIMACION;
+  if(!liq){ toast('⚠️ Abrí la intimación desde un lote primero'); return; }
+  const plazo = document.getElementById('int-plazo').value || '48';
+  const abogado = document.getElementById('int-abogado').value;
+  const direccion = document.getElementById('int-direccion').value;
+  const horario = document.getElementById('int-horario').value;
+  const contacto = document.getElementById('int-contacto').value;
+
+  const D = window.docx;
+  const logoBytes = _dataUriABytes(LOGO_LAS_PALMAS);
+  const hoy = new Date().toLocaleDateString('es-AR');
+
+  // ── Membrete (igual espíritu que el de los recibos: banda verde + logo + texto dorado) ──
+  const membrete = new D.Table({
+    width: {size:100, type:D.WidthType.PERCENTAGE},
+    borders: {top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideHorizontal:{style:D.BorderStyle.NONE},insideVertical:{style:D.BorderStyle.NONE}},
+    rows: [ new D.TableRow({ children: [ new D.TableCell({
+      shading: {fill:'1F4D3D'},
+      margins: {top:150, bottom:150, left:200, right:200},
+      children: [
+        new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[
+          new D.ImageRun({data:logoBytes, transformation:{width:50, height:50}})
+        ]}),
+        new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[
+          new D.TextRun({text:'Consorcio de Propietarios', color:'FFFFFF', size:20})
+        ]}),
+        new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[
+          new D.TextRun({text:'Barrio Las Palmas', color:'C79A44', bold:true, size:30})
+        ]}),
+        new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[
+          new D.TextRun({text:'Domicilio: William Cross 3302 · Las Talitas, Tucumán', color:'DCEBE4', size:16})
+        ]}),
+        new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[
+          new D.TextRun({text:'Administradores: Juan Ponce · Walter Vallejo', color:'DCEBE4', size:16})
+        ]}),
+      ]
+    })]})]
+  });
+
+  const p = (text, opts={}) => new D.Paragraph({spacing:{after:160}, ...opts, children:[new D.TextRun({text, ...opts.run})]});
+
+  const carta = [
+    membrete,
+    new D.Paragraph({text:'', spacing:{after:200}}),
+    new D.Paragraph({alignment:D.AlignmentType.RIGHT, children:[new D.TextRun(`S. M. de Tucumán, ${hoy}.`)], spacing:{after:300}}),
+    p('Sra./Sr.', {run:{bold:true}}),
+    p(liq.loteInfo.p.toUpperCase()),
+    p('Propietarios y/o Inquilinos'),
+    p(liq.loteInfo.l.toUpperCase(), {run:{bold:true}}),
+    p('WILLIAM CROSS 3302'),
+    p('Presente/s', {run:{italics:true}, spacing:{after:300}}),
+    p(`Me dirijo a Ud./es, en el carácter de abogado designado por la Administración del CONSORCIO DE PROPIETARIOS, siguiendo las expresas instrucciones impartidas, a fin de que en virtud de lo establecido por el Reglamento de Copropiedad y Administración y CCyCN, se pone en conocimiento "con carácter previo a juicio" que la Unidad Funcional registra la deuda que se detalla en el resumen adjunto al pie de la presente:`),
+    new D.Paragraph({spacing:{after:300}, children:[
+      new D.TextRun('Por la suma de '),
+      new D.TextRun({text:fa(liq.totGen), bold:true}),
+      new D.TextRun(`, a lo que se deberán adicionar los honorarios profesionales, y a cuyo pago se le intima por el término de ${plazo} horas.`)
+    ]}),
+    new D.Paragraph({spacing:{after:300}, children:[
+      new D.TextRun({text:`El pago deberá ser efectuado en el domicilio de este Estudio Jurídico, sito en calle ${direccion} (días de atención: ${horario}).`, bold:true})
+    ]}),
+    p(`En caso de no poder dar cumplimiento con la intimación cursada podrá comunicarse, dentro del plazo concedido, al ${contacto}, a los efectos de formalizar un acuerdo de pago, caso contrario se iniciará de inmediato la correspondiente ejecución judicial, con la traba de embargo sobre la propiedad.`, {spacing:{after:500}}),
+    new D.Paragraph({alignment:D.AlignmentType.RIGHT, children:[new D.TextRun('Saludo a Usted Atte.-')], spacing:{after:600}}),
+    new D.Paragraph({alignment:D.AlignmentType.RIGHT, children:[new D.TextRun({text:abogado.split(' — ')[0]||abogado, bold:true})]}),
+    new D.Paragraph({alignment:D.AlignmentType.RIGHT, children:[new D.TextRun(abogado.split(' — ')[1]||'')]}),
+    new D.Paragraph({children:[], pageBreakBefore:true}),
+  ];
+
+  // ── Página 2: liquidación (tabla real de Word, editable) ──
+  const celda = (text, opts={}) => new D.TableCell({
+    width:{size:opts.w||25, type:D.WidthType.PERCENTAGE},
+    shading: opts.shade ? {fill:opts.shade} : undefined,
+    margins:{top:80,bottom:80,left:100,right:100},
+    children:[new D.Paragraph({alignment:opts.align||D.AlignmentType.LEFT, children:[new D.TextRun({text, bold:opts.bold, color:opts.color, size:opts.size||18})]})]
+  });
+
+  const filasTabla = [
+    new D.TableRow({children:[
+      celda('Período / Tipo', {w:40,bold:true,shade:'F0F0F0'}),
+      celda('Capital', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
+      celda('Interés', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
+      celda('Subtotal', {w:20,bold:true,shade:'F0F0F0',align:D.AlignmentType.RIGHT}),
+    ]})
+  ];
+  liq.periodos.forEach(per=>{
+    if(per.cO){
+      filasTabla.push(new D.TableRow({children:[
+        celda(`${per.mes} — Exp. Ordinaria (${per.diasLabel})`, {w:40, color:'1565C0'}),
+        celda(fa(per.cO), {w:20, align:D.AlignmentType.RIGHT}),
+        celda(fa(per.iO), {w:20, align:D.AlignmentType.RIGHT, color:'E53935'}),
+        celda(fa(per.cO+per.iO), {w:20, align:D.AlignmentType.RIGHT, bold:true}),
+      ]}));
+    }
+    if(per.cX){
+      filasTabla.push(new D.TableRow({children:[
+        celda(`${per.mes} — Exp. Extraordinaria (${per.diasLabel})`, {w:40, color:'1A7A4A'}),
+        celda(fa(per.cX), {w:20, align:D.AlignmentType.RIGHT}),
+        celda(fa(per.iX), {w:20, align:D.AlignmentType.RIGHT, color:'E53935'}),
+        celda(fa(per.cX+per.iX), {w:20, align:D.AlignmentType.RIGHT, bold:true}),
+      ]}));
+    }
+  });
+  filasTabla.push(new D.TableRow({children:[
+    celda('Subtotal Exp. Ordinaria', {w:40,bold:true}),
+    celda(fa(liq.capOrd), {w:20,align:D.AlignmentType.RIGHT,bold:true}),
+    celda(fa(liq.intOrd), {w:20,align:D.AlignmentType.RIGHT,bold:true,color:'E53935'}),
+    celda(fa(liq.totOrd), {w:20,align:D.AlignmentType.RIGHT,bold:true}),
+  ]}));
+  filasTabla.push(new D.TableRow({children:[
+    celda('Subtotal Exp. Extraordinaria', {w:40,bold:true}),
+    celda(fa(liq.capExt), {w:20,align:D.AlignmentType.RIGHT,bold:true}),
+    celda(fa(liq.intExt), {w:20,align:D.AlignmentType.RIGHT,bold:true,color:'E53935'}),
+    celda(fa(liq.totExt), {w:20,align:D.AlignmentType.RIGHT,bold:true}),
+  ]}));
+
+  const tablaLiquidacion = new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE}, rows:filasTabla});
+
+  const liquidacion = [
+    p('Consorcio de Propietarios Barrio Las Palmas', {run:{bold:true, size:26, color:'1F4D3D'}}),
+    p('Domicilio: William Cross 3302 · Administradores: Juan Ponce / Walter Vallejo · Tel: 3814097776 / 3815995289', {run:{size:16, color:'666666'}}),
+    new D.Paragraph({text:'', spacing:{after:200}}),
+    p('Liquidación de deuda con intereses punitorios', {run:{size:22, color:'888888'}}),
+    p(`${liq.loteInfo.l} — ${liq.loteInfo.p} · Al ${liq.fc.toLocaleDateString('es-AR')} · Art. 8 Reglamento · Tasa 4% mensual`, {run:{size:16, color:'999999'}, spacing:{after:300}}),
+    tablaLiquidacion,
+    new D.Paragraph({text:'', spacing:{after:200}}),
+    new D.Paragraph({children:[new D.TextRun({text:'TOTAL A COBRAR: ', bold:true, size:22}), new D.TextRun({text:fa(liq.totOrd+liq.totExt), bold:true, size:22})], spacing:{after:300}}),
+    p('⚠ El presente cálculo está SUJETO A VERIFICACIÓN', {run:{color:'C62828', bold:true}, alignment:D.AlignmentType.CENTER, spacing:{after:200}}),
+    p('Art. 8 Reglamento de Copropiedad · Tasa punitoria: 4% mensual (0,1333% diario) · Vencimiento día 15 de cada mes', {run:{size:14, color:'999999'}, alignment:D.AlignmentType.CENTER, spacing:{after:600}}),
+    new D.Paragraph({children:[new D.TextRun('Juan Ponce / Walter Vallejo'.padEnd(40,' ')+'Juana B. Varvaro')], spacing:{after:100}}),
+    new D.Paragraph({children:[new D.TextRun({text:'Administradores'.padEnd(40,' ')+'Contadora Pública · M.P 7450 - C.G.C.E.T.', size:16, color:'666666'})]}),
+  ];
+
+  const doc = new D.Document({
+    sections: [{ children: [...carta, ...liquidacion] }]
+  });
+
+  const blob = await D.Packer.toBlob(doc);
+  const filename = `Intimacion_${liq.loteInfo.l.replace(/\s+/g,'_')}.docx`;
+  const file = new File([blob], filename, {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  cerrar('mod-intimacion');
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:'Intimación '+liq.loteInfo.l}).catch(()=>{
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+    });
+  } else {
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  }
+  registrarActividad(`Generó intimación (Word) para ${liq.loteInfo.l} (${liq.loteInfo.p}) por ${fa(liq.totGen)}`);
+ } catch(e){
+  console.error('generarWordIntimacion:', e);
+  alert('❌ Error al generar el Word: ' + e.message);
+ }
+};
+
 window.generarPDFIntimacion = () => {
  try {
   const liq = _ULT_INTIMACION;
@@ -1081,16 +1247,23 @@ window.generarPDFIntimacion = () => {
   const W = docPDF.internal.pageSize.getWidth();
   const verde=[31,77,61], dorado=[169,133,63];
 
-  // ── Página 1: carta de intimación ──
-  try { docPDF.addImage(LOGO_LAS_PALMAS, 'PNG', W/2-9, 10, 18, 18); } catch(e){}
-  docPDF.setTextColor(...verde); docPDF.setFontSize(15); docPDF.setFont(undefined,'bold');
-  docPDF.text('Bº PRIVADO LAS PALMAS', W/2, 33, {align:'center'});
-  docPDF.setFont(undefined,'normal'); docPDF.setFontSize(9); docPDF.setTextColor(90,90,90);
-  docPDF.text('William Cross Nº 3302 – El Colmenar', W/2, 38, {align:'center'});
-  docPDF.text('Las Talitas - Tucumán', W/2, 42.5, {align:'center'});
-  docPDF.setDrawColor(...dorado); docPDF.line(15, 46, W-15, 46);
+  // ── Página 1: carta de intimación (mismo membrete que los recibos) ──
+  docPDF.setFillColor(...verde);
+  docPDF.rect(0,0,W,34,'F');
+  try { docPDF.addImage(LOGO_LAS_PALMAS, 'PNG', 12, 5, 24, 24); } catch(e){}
+  const cx = 40 + (W-40)/2;
+  docPDF.setTextColor(255,255,255); docPDF.setFontSize(11);
+  docPDF.text('Consorcio de Propietarios', cx, 10, {align:'center'});
+  docPDF.setTextColor(...dorado); docPDF.setFontSize(15); docPDF.setFont(undefined,'bold');
+  docPDF.text('Barrio Las Palmas', cx, 17, {align:'center'});
+  docPDF.setFont(undefined,'normal');
+  docPDF.setTextColor(220,235,228); docPDF.setFontSize(8.5);
+  docPDF.text('Domicilio: William Cross 3302 · Las Talitas, Tucumán', cx, 23.5, {align:'center'});
+  docPDF.text('Administradores: Juan Ponce · Walter Vallejo', cx, 28, {align:'center'});
+  docPDF.setFontSize(7.5);
+  docPDF.text('Tel: 3814097776 / 3815995289 · juanlponce@hotmail.com · walterdariov@yahoo.com.ar', cx, 32, {align:'center'});
 
-  let y = 58;
+  let y = 46;
   docPDF.setTextColor(30,30,30); docPDF.setFontSize(10);
   const hoy = new Date().toLocaleDateString('es-AR');
   docPDF.text(`S. M. de Tucumán, ${hoy}.`, W-15, y, {align:'right'});
