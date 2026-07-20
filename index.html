@@ -184,6 +184,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" data-tab="rend" onclick="ST('rend',this)">📋 Informe mensual</button>
   <button class="tab" data-tab="egr" onclick="ST('egr',this)">📤 Gastos</button>
   <button class="tab" data-tab="deu" onclick="ST('deu',this)">⚠️ Deudores</button>
+  <button class="tab" data-tab="gc" onclick="ST('gc',this)">📢 Gestión de cobranza</button>
   <button class="tab" data-tab="plan" onclick="ST('plan',this)">📑 Planes de pago</button>
   <button class="tab" data-tab="int" onclick="ST('int',this)">📐 Calcular intereses</button>
   <button class="tab" data-tab="est" onclick="ST('est',this)">📊 Resumen financiero</button>
@@ -432,6 +433,26 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 
   <div id="lista-deu"></div>
+</div>
+
+<!-- GESTIÓN DE COBRANZA -->
+<div id="pnl-gc" class="pnl">
+  <div class="card">
+    <div class="ct">💰 Meta del día</div>
+    <div class="g2">
+      <div class="met"><div class="ml">Pendiente de cobrar</div><div class="mv rj" id="gc-pendiente" style="font-size:13px">—</div></div>
+      <div class="met"><div class="ml">Lotes accionables</div><div class="mv rj" id="gc-accionables">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">🚦 Semáforo de morosidad</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Ordenado por deuda, de mayor a menor — priorizá a quién llamar primero</div>
+    <div id="gc-semaforo"><div class="empty">Cargando...</div></div>
+  </div>
+  <div class="card">
+    <div class="ct">⏰ Próximos vencimientos de cuotas (10 días)</div>
+    <div id="gc-vencimientos"><div class="empty">Cargando...</div></div>
+  </div>
 </div>
 
 <!-- PLANES DE PAGO -->
@@ -950,12 +971,101 @@ window.ST = (n,el)=>{
   if(n==='plan') cargarPlanes();
   if(n==='ini') { renderInicio(); renderComparativo(); }
   if(n==='cob' || n==='rend') verificarCorrelatividadRecibos();
+  if(n==='gc') renderGestionCobranza();
 };
 
 window.irATab = (n) => {
   const el = document.querySelector('.tab[data-tab="'+n+'"]');
   if(el) ST(n, el);
 };
+
+// ── GESTIÓN DE COBRANZA ──
+function textoAvisoDeuda(b, monto){
+  return `Estimado/a ${b.p}:\n\nLe recordamos que el ${b.l} del Consorcio Barrio Las Palmas registra una deuda de ${fa(monto)} a la fecha.\n\nLe solicitamos regularizar la situación a la brevedad para evitar la generación de mayores intereses por mora.\n\nAnte cualquier consulta, quedamos a disposición.\n\nAdministración Barrio Las Palmas`;
+}
+
+window.copiarAvisoDeuda = async (n) => {
+  const item = _ULT_GC_SEMAFORO.find(x=>x.n===n);
+  if(!item) return;
+  const texto = textoAvisoDeuda(item, item.deuda);
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast('📋 Aviso copiado — pegalo en WhatsApp o mail');
+  } catch(e){ alert(texto); }
+};
+
+let _ULT_GC_SEMAFORO = [];
+async function renderGestionCobranza(){
+  const elSem = document.getElementById('gc-semaforo');
+  const elVenc = document.getElementById('gc-vencimientos');
+  if(!elSem || !elVenc) return;
+
+  const ORD_K = ['oe','ob','or','oa','oy','ju_ord','jul_ord'];
+  const EXT_K = ['xr','xa','xy','ju_ext','jul_ext'];
+  const DEU_EF = DEU.map(d=>calcDeudaEfectiva(d));
+  const items = [];
+  DEU_EF.forEach(d=>{
+    const loteInfo = LB.find(x=>x.l===d.l);
+    if(!loteInfo) return;
+    const ordMeses = ORD_K.filter(k=>(d[k]||0)>0).length;
+    const extMeses = EXT_K.filter(k=>(d[k]||0)>0).length;
+    const meses = Math.max(ordMeses, extMeses);
+    if(meses < 1) return; // al día, no aparece
+    const deuda = ORD_K.reduce((s,k)=>s+(d[k]||0),0) + EXT_K.reduce((s,k)=>s+(d[k]||0),0);
+    if(deuda <= 0) return;
+    items.push({n:loteInfo.n, l:d.l, p:d.p, meses, deuda});
+  });
+  items.sort((a,b)=>b.deuda-a.deuda);
+  _ULT_GC_SEMAFORO = items;
+
+  const totalPendiente = items.reduce((s,i)=>s+i.deuda,0);
+  document.getElementById('gc-pendiente').textContent = fa(totalPendiente);
+  document.getElementById('gc-accionables').textContent = items.length;
+
+  if(!items.length){
+    elSem.innerHTML = '<div class="empty">Ningún lote con deuda 🎉</div>';
+  } else {
+    elSem.innerHTML = items.map(i=>{
+      const color = i.meses>=2 ? '#e53935' : '#f9a825';
+      const bg = i.meses>=2 ? '#ffebee' : '#fff8e1';
+      const label = i.meses>=2 ? `${i.meses} meses` : '1 mes';
+      return `<div class="log-item" style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer" onclick="irALoteDesdeBusqueda(${i.n})">
+          <span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
+          <div><span style="font-size:11px;font-weight:700;color:${color};background:${bg};padding:1px 6px;border-radius:4px">${i.l}</span> ${i.p}
+            <div style="font-size:10px;color:#888">${label} de atraso · ${fa(i.deuda)}</div>
+          </div>
+        </div>
+        <span style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer;white-space:nowrap" onclick="copiarAvisoDeuda(${i.n})">📋 Aviso</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Próximos vencimientos de cuotas de planes de pago (10 días)
+  if(!PLANES || !PLANES.length){
+    try { await cargarPlanes(); } catch(e){ /* sin planes o sin acceso */ }
+  }
+  const hoy = new Date();
+  const limite = new Date(hoy.getTime() + 10*24*60*60*1000);
+  const proximos = [];
+  (PLANES||[]).forEach(p=>{
+    if(p.caido) return;
+    (p.cuotas||[]).forEach((c,idx)=>{
+      if(c.estado!=='pendiente') return;
+      const venc = new Date(c.vencimiento+'T23:59:59');
+      if(venc >= hoy && venc <= limite){
+        proximos.push({lote:p.lote, propietario:p.propietario, cuota:idx+1, total:p.cuotas.length, vencimiento:c.vencimiento, importe:c.importe});
+      }
+    });
+  });
+  proximos.sort((a,b)=>a.vencimiento.localeCompare(b.vencimiento));
+  elVenc.innerHTML = proximos.length ? proximos.map(v=>`
+    <div class="log-item">
+      <div><span style="font-size:11px;font-weight:700;color:#f57c00;background:#fff3e0;padding:1px 6px;border-radius:4px">${v.lote}</span> ${v.propietario}
+        <div style="font-size:10px;color:#888">Cuota ${v.cuota}/${v.total} · vence ${new Date(v.vencimiento+'T00:00:00').toLocaleDateString('es-AR')} · ${fa(v.importe)}</div>
+      </div>
+    </div>`).join('') : '<div class="empty">Sin vencimientos en los próximos 10 días</div>';
+}
 
 // ── CORRELATIVIDAD DE RECIBOS ──
 // Chequea que la numeración de RECIBOS no tenga saltos (recibos que nunca
