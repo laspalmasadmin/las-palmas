@@ -354,9 +354,16 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="fg"><label>N° Recibo</label><input type="text" id="ir" placeholder="355"></div>
     <div class="fg"><label>Fecha</label><input type="text" id="id" placeholder="05/06/2026"></div>
     <div class="fg"><label>Observación</label><input type="text" id="iob" placeholder="Cuota 3/12"></div>
+    <div class="fg" style="background:#fff8ec;border:1px solid #ecd9ad;border-radius:8px;padding:8px 10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
+        <input type="checkbox" id="chk-recibo-manual" style="width:16px;height:16px" onchange="if(this.checked) document.getElementById('chk-recibo-digital').checked=false">
+        <span style="font-size:12px;font-weight:700;color:#8a6d1a">📝 Recibo manual (talonario en papel, no digital)</span>
+      </label>
+      <div style="font-size:11px;color:#8a6d1a;margin-top:4px">Tildá esto si el N° de Recibo de arriba es de un talonario físico — la alerta de correlativa no lo va a contar como salto.</div>
+    </div>
     <div class="fg" style="background:#f0f7f4;border:1px solid #cfe8dc;border-radius:8px;padding:8px 10px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
-        <input type="checkbox" id="chk-recibo-digital" style="width:16px;height:16px">
+        <input type="checkbox" id="chk-recibo-digital" style="width:16px;height:16px" onchange="if(this.checked) document.getElementById('chk-recibo-manual').checked=false">
         <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR + WhatsApp)</span>
       </label>
       <div style="margin-top:8px">
@@ -379,6 +386,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <!-- RENDICION -->
 <div id="pnl-rend" class="pnl">
   <div id="rend-alerta-recibos"></div>
+  <button class="btn-sm" style="width:100%;background:#fff;border-color:#8a6d1a;color:#8a6d1a;margin-bottom:10px" onclick="marcarRecibosManualesDelMes()">📝 Marcar como manuales los recibos en papel de este mes</button>
   <div class="card" style="padding:10px 12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
@@ -702,7 +710,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const app = initializeApp({
@@ -1730,6 +1738,13 @@ async function renderGestionCobranza(){
 // Chequea que la numeración de RECIBOS no tenga saltos (recibos que nunca
 // se generaron/guardaron). Los anulados SÍ cuentan como existentes —
 // conservan su número, así que no aparecen como falta.
+// Los cobros marcados reciboManual:true (talonario en papel, sin recibo
+// digital) NO deben contar como salto: sus números se restan del chequeo.
+function _numsDeTextoRecibo(txt){
+  if(!txt) return [];
+  const m = String(txt).match(/\d+/g);
+  return m ? m.map(x=>parseInt(x)) : [];
+}
 async function verificarCorrelatividadRecibos(){
   const ids = ['cob-alerta-recibos','rend-alerta-recibos'];
   const els = ids.map(id=>document.getElementById(id)).filter(Boolean);
@@ -1744,18 +1759,28 @@ async function verificarCorrelatividadRecibos(){
     const min = Math.min(INICIO_RECIBOS, nums[0]);
     const max = nums[nums.length-1];
     const set = new Set(nums);
+
+    // Recibos manuales (papel): sus números no deben marcarse como salto.
+    const fuenteCobros = (typeof TODOS_COBROS !== 'undefined' && TODOS_COBROS.length) ? TODOS_COBROS : COBROS;
+    const manualSet = new Set();
+    (fuenteCobros||[]).forEach(c=>{
+      if(c && c.reciboManual){ _numsDeTextoRecibo(c.recibo).forEach(n=>manualSet.add(n)); }
+    });
+
     const faltantes = [];
-    for(let n=min; n<=max; n++){ if(!set.has(n)) faltantes.push(n); }
+    for(let n=min; n<=max; n++){ if(!set.has(n) && !manualSet.has(n)) faltantes.push(n); }
+    const manualesEnRango = [...manualSet].filter(n=>n>=min && n<=max);
+    const detalleManual = manualesEnRango.length ? ` + ${manualesEnRango.length} recibo${manualesEnRango.length===1?'':'s'} manual${manualesEnRango.length===1?'':'es'} (papel)` : '';
     let html;
     if(faltantes.length){
       html = `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
         <div class="ct" style="color:#e53935">🔴 Salto en la numeración de recibos</div>
-        <div style="font-size:12px">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos en el sistema). Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
+        <div style="font-size:12px">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}). Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
       </div>`;
     } else {
       html = `<div class="card" style="border:1px solid #1a7a4a;background:#f2f9f5;margin-bottom:10px">
         <div class="ct" style="color:#1a7a4a">✅ Numeración de recibos correlativa</div>
-        <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos), sin saltos.</div>
+        <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}), sin saltos.</div>
       </div>`;
     }
     els.forEach(el=>el.innerHTML=html);
@@ -1764,6 +1789,45 @@ async function verificarCorrelatividadRecibos(){
     els.forEach(el=>el.innerHTML='');
   }
 }
+
+// Utilidad de una sola vez: para los cobros de ESTE mes que ya están cargados
+// con un N° de recibo en papel (texto) pero sin el flag reciboManual (porque
+// se cargaron antes de que existiera este checkbox), los marca retroactivamente
+// como manuales — solo si ese número no corresponde a ningún recibo digital
+// real en RECIBOS. No toca los que ya tienen reciboManual, ni los que sí
+// coinciden con un recibo digital existente.
+window.marcarRecibosManualesDelMes = async () => {
+  try {
+    const snapR = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
+    const digitalSet = new Set();
+    snapR.forEach(d=>{ const n = parseInt(d.data().recibo); if(!isNaN(n)) digitalSet.add(n); });
+
+    const candidatos = COBROS.filter(c=>{
+      if(c.reciboManual) return false;
+      const nums = _numsDeTextoRecibo(c.recibo);
+      if(!nums.length) return false;
+      return nums.every(n=>!digitalSet.has(n));
+    });
+
+    if(!candidatos.length){ toast('✅ No hay recibos de este mes para marcar como manuales'); return; }
+
+    const ok = confirm(`Se van a marcar ${candidatos.length} cobro(s) de este mes como "recibo manual (papel)", porque su número no corresponde a ningún recibo digital generado. ¿Confirmás?`);
+    if(!ok) return;
+
+    let hechos = 0;
+    for(const c of candidatos){
+      await updateDoc(doc(db, colC(), c._id), { reciboManual: true });
+      hechos++;
+    }
+    toast(`✅ ${hechos} cobro(s) marcado(s) como recibo manual`);
+    registrarActividad(`Marcó ${hechos} cobro(s) del mes como recibo manual (papel)`);
+    cargarTodosCobros();
+    verificarCorrelatividadRecibos();
+  } catch(e){
+    console.error(e);
+    toast('❌ Error marcando recibos manuales: '+e.message);
+  }
+};
 
 // ── INICIO (portada / dashboard) ──
 function renderInicio(){
@@ -2241,6 +2305,7 @@ window.registrar = async () => {
       capitalPer,
       forma: document.getElementById('sf').value,
       recibo: document.getElementById('ir').value||'—',
+      reciboManual: document.getElementById('chk-recibo-manual').checked,
       fecha: document.getElementById('id').value||'',
       lemon: document.getElementById('ilemon').value.trim()||'',
       comprobanteImg: window._comprobanteDataURL||'',
@@ -2260,6 +2325,7 @@ window.registrar = async () => {
     window.quitarComprobante();
     document.querySelectorAll('input[name="sper"]').forEach(cb=>cb.checked=false);
     document.getElementById('ir').value='';
+    document.getElementById('chk-recibo-manual').checked=false;
     document.getElementById('interes-periodos').innerHTML='';
     window.renderInteresPeriodos();
     window.actualizarDeudaPreview();
