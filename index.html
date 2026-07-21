@@ -160,6 +160,17 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   </div>
 </div>
 
+<!-- DECLARAR PAGO (público, sin login) -->
+<div id="declarar-screen" style="display:none;position:fixed;top:0;left:0;width:100%;min-height:100%;background:#f0f2f5;z-index:2000;padding:24px 16px;box-sizing:border-box;overflow-y:auto">
+  <div class="card" style="max-width:420px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-weight:700;color:#256B4E;font-size:16px">🏘 Barrio Las Palmas</div>
+      <div style="font-size:11px;color:#888">Avisar un pago</div>
+    </div>
+    <div id="declarar-body"></div>
+  </div>
+</div>
+
 <div class="hdr">
   <div><h1><img src="data:image/png;base64,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" alt="" style="width:24px;height:auto;vertical-align:middle">Consorcio Las Palmas</h1><p id="hdr-p">Cobranzas Mayo 2026</p></div>
   <div class="hdr-r">
@@ -222,6 +233,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
     <button class="btn-sm" style="width:100%;margin-top:8px;background:#fff;border:1px solid #e53935;color:#e53935;font-weight:700" onclick="irATab('deu')">Ver listado de deudores →</button>
   </div>
+  <div id="ini-declaraciones"></div>
   <div class="card">
     <div class="ct">🚀 Accesos rápidos</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1859,7 +1871,63 @@ function renderInicio(){
   const deuTot = document.getElementById('deu-tot-gen');
   setTxt('ini-deu-cnt', deuCnt ? deuCnt.textContent : '—');
   setTxt('ini-deu-tot', deuTot ? deuTot.textContent : '—');
+  renderDeclaracionesPendientes();
 }
+
+// Trae y muestra las declaraciones de pago hechas por propietarios (sin login)
+// que todavía no fueron revisadas. "Aprobar" precarga el cobro en la pestaña
+// Cobros (mismo patrón que precargarCobro en Control bancario) para que el
+// administrador confirme período/concepto antes de guardar — no se registra
+// el cobro solo, para no saltear ese control. "Rechazar" solo cambia el estado.
+async function renderDeclaracionesPendientes(){
+  const el = document.getElementById('ini-declaraciones');
+  if(!el) return;
+  try {
+    const q = query(collection(db, 'DECLARACIONES_PAGO'), where('estado','==','pendiente'));
+    const snap = await getDocs(q);
+    if(snap.empty){ el.innerHTML=''; return; }
+    const filas = [];
+    snap.forEach(d=>filas.push({...d.data(), _id:d.id}));
+    filas.sort((a,b)=>(a.creadoEn||'').localeCompare(b.creadoEn||''));
+    el.innerHTML = `<div class="card" style="border:1px solid #1565c0">
+      <div class="ct" style="color:#1565c0">📥 Pagos avisados por propietarios (${filas.length})</div>
+      ${filas.map(f=>`
+        <div style="border-top:1px solid #eee;padding:8px 0;font-size:12px">
+          <div style="display:flex;justify-content:space-between">
+            <b>${f.lote} — ${f.propietario}</b>
+            <b style="color:#1a7a4a">$${Math.round(f.monto).toLocaleString('es-AR')}</b>
+          </div>
+          <div style="color:#888;font-size:11px">${f.fecha} · ${f.forma}${f.obs?' · '+f.obs:''}</div>
+          ${f.comprobanteImg?`<img src="${f.comprobanteImg}" style="max-width:100px;border-radius:6px;margin-top:4px;display:block">`:''}
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn-sm" style="flex:1;background:#1a7a4a;color:#fff;border:none" onclick="aprobarDeclaracionPago('${f._id}','${f.lote}',${f.monto},'${f.fecha}')">✅ Aprobar</button>
+            <button class="btn-sm" style="flex:1;background:#fff;border-color:#e53935;color:#e53935" onclick="rechazarDeclaracionPago('${f._id}')">✕ Rechazar</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  } catch(e){
+    console.error('renderDeclaracionesPendientes:', e);
+    el.innerHTML = '';
+  }
+}
+
+window.aprobarDeclaracionPago = async (id, lote, monto, fecha) => {
+  try {
+    await updateDoc(doc(db, 'DECLARACIONES_PAGO', id), { estado: 'en_revision' });
+  } catch(e){ console.error(e); }
+  precargarCobro(lote, monto, fecha);
+  toast('📋 Completá el cobro y guardalo para terminar de aprobarlo');
+};
+
+window.rechazarDeclaracionPago = async (id) => {
+  const ok = confirm('¿Rechazar esta declaración de pago? El propietario no va a ver ningún aviso automático — avisale vos por otro medio si hace falta.');
+  if(!ok) return;
+  try {
+    await updateDoc(doc(db, 'DECLARACIONES_PAGO', id), { estado: 'rechazado' });
+    toast('✕ Declaración rechazada');
+    renderDeclaracionesPendientes();
+  } catch(e){ toast('❌ Error: '+e.message); }
+};
 
 // ── BUSCADOR GLOBAL ──
 window.abrirBuscador = () => {
@@ -4096,9 +4164,102 @@ async function mostrarVerificacionPublica(codigo){
   }
 }
 
-// Vista previa de EJEMPLO para mostrarle el diseño del recibo a Juan/Walter sin
-// generar nada real: no guarda en RECIBOS, no gasta un número de la numeración
-// correlativa, no toca ningún cobro. Usa datos ficticios fijos.
+// ══════════════ DECLARACIÓN PÚBLICA DE PAGO (sin login) ══════════════
+// Un propietario, sin necesidad de usuario/contraseña, avisa que hizo una
+// transferencia. Queda en la colección DECLARACIONES_PAGO con estado
+// "pendiente" para que un administrador la revise y la apruebe (cargándola
+// como cobro real) o la rechace. Requiere que las reglas de Firestore
+// permitan CREATE público en esta colección puntual (no read/update/delete).
+function mostrarDeclararScreen(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('declarar-screen').style.display='block';
+  const body = document.getElementById('declarar-body');
+  const opciones = LB.map(b=>`<option value="${b.n}">${b.l} — ${b.p}</option>`).join('');
+  body.innerHTML = `
+    <div class="fg"><label>Tu lote</label>
+      <select id="dp-lote"><option value="">Elegí tu lote...</option>${opciones}</select>
+    </div>
+    <div class="fg"><label>Monto transferido ($)</label>
+      <input type="number" id="dp-monto" inputmode="numeric" placeholder="90000">
+    </div>
+    <div class="fg"><label>Fecha del pago</label>
+      <input type="text" id="dp-fecha" placeholder="21/07/2026" value="${new Date().toLocaleDateString('es-AR')}">
+    </div>
+    <div class="fg"><label>Forma</label>
+      <select id="dp-forma"><option>Transferencia</option><option>Efectivo</option><option>Débito</option></select>
+    </div>
+    <div class="fg"><label>Foto del comprobante (opcional, recomendado)</label>
+      <input type="file" id="dp-foto" accept="image/*" onchange="leerComprobanteDeclaracion(this)">
+      <div id="dp-foto-preview" style="display:none;margin-top:6px">
+        <img id="dp-foto-img" style="max-width:140px;border-radius:6px;border:1px solid #ddd;display:block">
+      </div>
+    </div>
+    <div class="fg"><label>Observación (opcional)</label>
+      <input type="text" id="dp-obs" placeholder="Cuota 2/6, etc.">
+    </div>
+    <button class="btn" id="dp-btn" onclick="enviarDeclaracionPago()">✓ Avisar este pago</button>
+    <div id="dp-out" style="margin-top:10px"></div>
+  `;
+}
+
+window._dpFotoDataURL = '';
+window.leerComprobanteDeclaracion = (input) => {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height, max = 500;
+      if(w > h && w > max){ h = Math.round(h*max/w); w = max; }
+      else if(h > max){ w = Math.round(w*max/h); h = max; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      window._dpFotoDataURL = canvas.toDataURL('image/jpeg', 0.45);
+      document.getElementById('dp-foto-img').src = window._dpFotoDataURL;
+      document.getElementById('dp-foto-preview').style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.enviarDeclaracionPago = async () => {
+  const out = document.getElementById('dp-out');
+  const btn = document.getElementById('dp-btn');
+  const loteN = parseInt(document.getElementById('dp-lote').value);
+  const monto = parseFloat(document.getElementById('dp-monto').value);
+  const fecha = document.getElementById('dp-fecha').value.trim();
+  const forma = document.getElementById('dp-forma').value;
+  const obs = document.getElementById('dp-obs').value.trim();
+  if(!loteN || !monto || !fecha){
+    out.innerHTML = '<div class="empty" style="color:#c62828">Completá lote, monto y fecha</div>';
+    return;
+  }
+  const b = LB.find(x=>x.n===loteN);
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    await addDoc(collection(db, 'DECLARACIONES_PAGO'), {
+      lote: b?b.l:'', propietario: b?b.p:'', loteN,
+      monto, fecha, forma, obs,
+      comprobanteImg: window._dpFotoDataURL || '',
+      estado: 'pendiente',
+      creadoEn: new Date().toISOString()
+    });
+    document.getElementById('declarar-body').innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:32px">✅</div>
+        <div style="font-weight:700;color:#1a7a4a;margin-top:8px">¡Listo, avisado!</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">La administración va a revisar tu pago y lo va a cargar. Gracias.</div>
+      </div>`;
+  } catch(e){
+    out.innerHTML = `<div class="empty" style="color:#c62828">Error: ${e.message} — probá de nuevo o avisá directo a la administración</div>`;
+    btn.disabled = false; btn.textContent = '✓ Avisar este pago';
+  }
+};
+
+
 window.previsualizarReciboEjemplo = () => {
   const n = parseInt(document.getElementById('sl').value);
   const loteReal = LB.find(x=>x.n===n);
@@ -5100,6 +5261,8 @@ window.borrarPlan = async () => {
 // INIT
 if(location.hash.startsWith('#verificar/')){
   mostrarVerificacionPublica(decodeURIComponent(location.hash.replace('#verificar/','')));
+} else if(location.hash.startsWith('#declarar')){
+  mostrarDeclararScreen();
 } else {
   poblarSL();
   poblarIntLote();
