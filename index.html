@@ -331,6 +331,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
         <option value="ordinaria">Exp. Ordinaria</option>
         <option value="extraordinaria">Exp. Extraordinaria</option>
         <option value="ambas">Ambas (Ordinaria + Extraordinaria)</option>
+        <option value="extrajudicial">Cuota Extrajudicial (acuerdo cobranza)</option>
         <option value="cargo">Cargo</option>
       </select>
     </div>
@@ -2460,7 +2461,7 @@ function renderCob(){
   }).join('');
 }
 
-function tipoL(t){ return t==='ordinaria'?'Exp. Ordinaria':t==='extraordinaria'?'Exp. Extraordinaria':t==='ambas'?'Exp. Ordinaria + Extraordinaria':'Cargo'; }
+function tipoL(t){ return t==='ordinaria'?'Exp. Ordinaria':t==='extraordinaria'?'Exp. Extraordinaria':t==='ambas'?'Exp. Ordinaria + Extraordinaria':t==='extrajudicial'?'Cuota Extrajudicial':'Cargo'; }
 
 // Poblar select lotes
 function poblarSL(){
@@ -3139,7 +3140,7 @@ function getDeudaLotePeriodos(n, conc){
   if(!base) return [];
   const efectivo = calcDeudaEfectiva(base);
 
-  if(conc === 'ambas'){
+  if(conc === 'ambas' || conc === 'extrajudicial'){
     const etiqueta = {};
     PERIODOS_ORD.forEach(p=>etiqueta[p.k]=p.label);
     PERIODOS_EXT.forEach(p=>etiqueta[p.k]=p.label);
@@ -3167,7 +3168,7 @@ window.actualizarDeudaPreview = () => {
   if(!n || conc==='cargo'){ el.style.display='none'; return; }
   const periodos = getDeudaLotePeriodos(n, conc);
   const condLabel = conc==='extraordinaria' ? 'extraordinaria'
-                  : conc==='ambas' ? 'ordinaria ni extraordinaria'
+                  : (conc==='ambas' || conc==='extrajudicial') ? 'ordinaria ni extraordinaria'
                   : 'ordinaria';
   el.style.display='block';
   if(!periodos.length){
@@ -4026,6 +4027,14 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   y += 5;
   docPDF.setFontSize(9); docPDF.setTextColor(90,90,90);
   docPDF.text(loteInfo?loteInfo.l:'', 10, y);
+
+  if(cobro.conc==='extrajudicial' && cobro.obs){
+    y += 7;
+    docPDF.setFontSize(7.5); docPDF.setTextColor(90,90,90);
+    const obsLines = docPDF.splitTextToSize(cobro.obs, W-20);
+    docPDF.text(obsLines, 10, y);
+    y += (obsLines.length * 3.3);
+  }
 
   y += 8;
   docPDF.setFontSize(8); docPDF.setTextColor(140,140,140);
