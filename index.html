@@ -1792,12 +1792,28 @@ async function verificarCorrelatividadRecibos(){
   try {
     const snap = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
     const nums = [];
-    snap.forEach(d=>{ const n = parseInt(d.data().recibo); if(!isNaN(n)) nums.push(n); });
+    // Para detectar duplicados hace falta guardar CADA recibo (lote/código),
+    // no solo la lista de números — dos recibos con el mismo N.º no se ven
+    // como "salto" (el chequeo de huecos no los detecta), hay que buscarlos aparte.
+    const porNumero = {};
+    snap.forEach(d=>{
+      const n = parseInt(d.data().recibo);
+      if(!isNaN(n)){
+        nums.push(n);
+        if(!porNumero[n]) porNumero[n] = [];
+        porNumero[n].push({lote:d.data().lote||'?', propietario:d.data().propietario||'?', codigo:d.data().codigo||'', anulado:!!d.data().anulado});
+      }
+    });
     if(nums.length < 1){ els.forEach(el=>el.innerHTML=''); return; }
     nums.sort((a,b)=>a-b);
     const min = Math.min(INICIO_RECIBOS, nums[0]);
     const max = nums[nums.length-1];
     const set = new Set(nums);
+
+    // Duplicados: mismo número de recibo en más de un documento (contando
+    // los anulados también, porque el problema es el número repetido, no
+    // si están vigentes).
+    const duplicados = Object.entries(porNumero).filter(([n,arr])=>arr.length>1);
 
     // Recibos manuales (papel): sus números no deben marcarse como salto.
     const fuenteCobros = (typeof TODOS_COBROS !== 'undefined' && TODOS_COBROS.length) ? TODOS_COBROS : COBROS;
@@ -1810,16 +1826,28 @@ async function verificarCorrelatividadRecibos(){
     for(let n=min; n<=max; n++){ if(!set.has(n) && !manualSet.has(n)) faltantes.push(n); }
     const manualesEnRango = [...manualSet].filter(n=>n>=min && n<=max);
     const detalleManual = manualesEnRango.length ? ` + ${manualesEnRango.length} recibo${manualesEnRango.length===1?'':'s'} manual${manualesEnRango.length===1?'':'es'} (papel)` : '';
-    let html;
+
+    const htmlDuplicados = duplicados.length ? `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
+      <div class="ct" style="color:#e53935">🔴 N.º de recibo repetido</div>
+      <div style="font-size:12px">
+        ${duplicados.map(([n,arr])=>`<b>N.º ${n}</b> usado ${arr.length} veces: ${arr.map(x=>`${x.lote} — ${x.propietario}${x.anulado?' (anulado)':''}`).join(' · ')}`).join('<br>')}
+      </div>
+    </div>` : '';
+
+    let html = htmlDuplicados;
     if(faltantes.length){
-      html = `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
+      html += `<div class="card" style="border:1px solid #e53935;background:#fff5f5;margin-bottom:10px">
         <div class="ct" style="color:#e53935">🔴 Salto en la numeración de recibos</div>
         <div style="font-size:12px">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}). Falta${faltantes.length===1?'':'n'} el N.º ${faltantes.join(', ')} — revisá si el recibo no se generó, quedó sin guardar, o se saltó por error.</div>
       </div>`;
-    } else {
-      html = `<div class="card" style="border:1px solid #1a7a4a;background:#f2f9f5;margin-bottom:10px">
+    } else if(!duplicados.length){
+      html += `<div class="card" style="border:1px solid #1a7a4a;background:#f2f9f5;margin-bottom:10px">
         <div class="ct" style="color:#1a7a4a">✅ Numeración de recibos correlativa</div>
         <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}), sin saltos.</div>
+      </div>`;
+    } else {
+      html += `<div class="card" style="border:1px solid #1a7a4a;background:#f2f9f5;margin-bottom:10px">
+        <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}), sin huecos — pero mirá el duplicado de arriba.</div>
       </div>`;
     }
     els.forEach(el=>el.innerHTML=html);
