@@ -4110,18 +4110,18 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
 // Imprime un PDF (jsPDF doc) directo, sin pasar por WhatsApp ni por el visor
 // del navegador — igual de práctico que el botón "🖨️ Imprimir" que ya usa
 // el resto de la app (ej. imprimirLote()).
+// El método viejo (iframe oculto + contentWindow.print()) falla en silencio
+// en Chrome Android — ya pasó antes con la intimación. En vez de depender de
+// un diálogo de impresión que puede no aparecer, se descarga el PDF directo:
+// así el celu lo abre con su visor normal, y desde ahí sí se puede imprimir
+// o compartir con cualquier app, sin depender de esta función.
 function imprimirPDF(pdfDoc){
-  const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
-  const ifr = document.createElement('iframe');
-  ifr.style.display='none';
-  ifr.src = blobUrl;
-  document.body.appendChild(ifr);
-  ifr.onload = () => {
-    setTimeout(()=>{
-      ifr.contentWindow.focus();
-      ifr.contentWindow.print();
-    }, 300);
-  };
+  try{
+    pdfDoc.save('recibo.pdf');
+    toast('📄 PDF descargado — abrilo desde tus Descargas para imprimir o compartir');
+  }catch(e){
+    toast('❌ Error al descargar: '+e.message);
+  }
 }
 
 // ══════════════ WHATSAPP VINCULADO POR LOTE ══════════════
@@ -4182,17 +4182,22 @@ window.enviarReciboWhatsappDirecto = async (tel, numero, fecha, monto, propietar
 // (Web Share API con archivo). Si el navegador no lo soporta (ej. desktop
 // sin esa API), baja el PDF y abre WhatsApp Web con un texto para adjuntarlo a mano.
 async function compartirReciboWhatsapp(pdfDoc, filename, resumenTexto){
-  const blob = pdfDoc.output('blob');
-  const file = new File([blob], filename, {type:'application/pdf'});
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{
-      await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:resumenTexto});
-      return;
-    }catch(e){ /* usuario canceló o falló: cae al fallback */ }
+  try{
+    const blob = pdfDoc.output('blob');
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:resumenTexto});
+        return;
+      }catch(e){ /* usuario canceló o falló: cae al fallback */ }
+    }
+    pdfDoc.save(filename);
+    toast('📄 PDF descargado — adjuntalo manualmente en WhatsApp desde tus Descargas');
+    const wa = 'https://wa.me/?text=' + encodeURIComponent(resumenTexto + '\n(Adjuntá el PDF que se acaba de descargar)');
+    window.open(wa, '_blank');
+  }catch(e){
+    toast('❌ Error al compartir: '+e.message+' — probá descargarlo con el botón Imprimir/PDF');
   }
-  pdfDoc.save(filename);
-  const wa = 'https://wa.me/?text=' + encodeURIComponent(resumenTexto + '\n(Adjuntá el PDF que se acaba de descargar)');
-  window.open(wa, '_blank');
 }
 
 // Punto de entrada: crea el doc en RECIBOS, arma el PDF, y muestra la vista
