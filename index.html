@@ -632,7 +632,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <div id="pnl-rec" class="pnl">
   <div class="card">
     <div class="ct">🧾 Ver recibo</div>
-    <div class="fg"><label>Seleccioná el lote</label><select id="rs" onchange="verRecibo()"></select></div>
+    <div class="fg"><label>Seleccioná el lote</label><select id="rs" onchange="buscarRecibosLote()"></select></div>
     <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
   </div>
   <div id="rc"><div class="empty">Seleccioná un lote</div></div>
@@ -4570,34 +4570,77 @@ function poblarRS(){
   const cobPorLote={};
   COBROS.forEach(c=>{ const k=parseInt(c.n); if(!cobPorLote[k]) cobPorLote[k]=[]; cobPorLote[k].push(c); });
   LB.forEach(b=>{ if(cobPorLote[b.n]){ const o=document.createElement('option'); o.value=b.n; o.textContent=b.l+' — '+b.p; s.appendChild(o); } });
-  if(s.options.length) verRecibo();
+  if(s.options.length) buscarRecibosLote();
 }
 
-window.verRecibo=()=>{
-  const n=parseInt(document.getElementById('rs').value);
-  const b=LB.find(x=>x.n===n);
-  const cobs=COBROS.filter(c=>parseInt(c.n)===n);
-  if(!b||!cobs.length){document.getElementById('rc').innerHTML='<div class="empty">Sin cobros</div>';return;}
-  const tot=cobs.reduce((s,c)=>s+c.monto,0);
-  const recs=[...new Set(cobs.map(c=>c.recibo).filter(Boolean))].join(' / ');
-  document.getElementById('rc').innerHTML=`
-    <div class="rw"><div class="rbx">
-      <div class="rh"><h2>🏘 Barrio Privado Las Palmas</h2>
-        <p>William Cross 3302 · Administradores: Juan Ponce / Walter Vallejo</p>
-        <p style="margin-top:5px;font-size:11px;font-weight:700;color:#222">Rendición — ${MES_NOM}</p>
-        ${recs?`<p style="font-size:12px;margin-top:3px">N° Recibo: <b>${recs}</b></p>`:''}
-      </div>
-      <div class="rr"><span class="rlab">Propietario</span><span><b>${b.p}</b></span></div>
-      <div class="rr"><span class="rlab">Lote</span><span>${b.l}</span></div>
-      <div class="rr"><span class="rlab">Fecha</span><span>${cobs[0].fecha||'—'}</span></div>
-      <div class="rr"><span class="rlab">Forma</span><span>${cobs[0].forma||'—'}</span></div>
-      ${cobs.map(c=>{
-        const det = c.interes ? `<br><span style="font-size:9px;color:#888;font-weight:400">Capital ${fa(c.monto-c.interes)} + Interés ${fa(c.interes)}</span>` : '';
-        return `<div class="rr"><span class="rlab">${tipoL(c.conc)}${c.obs?' ('+c.obs+')':''}</span><span style="font-weight:700;text-align:right">${fa(c.monto)}${det}</span></div>`;
-      }).join('')}
-      <div class="rtot"><span>Total abonado</span><span>${fa(tot)}</span></div>
-      <div class="rfirma">Contadora: Juana B. Varvaro · CPN · M.P 7450 - C.G.C.E.T.</div>
-    </div></div>`;
+// Busca en la colección RECIBOS (todos los meses, no solo el actual) los
+// recibos digitales reales ya generados para el lote elegido, y los lista
+// para poder reimprimirlos con el diseño real (QR, firma, etc.) en vez de
+// la liquidación de deuda que mostraba esta pestaña antes.
+window.buscarRecibosLote = async () => {
+  const n = parseInt(document.getElementById('rs').value);
+  const b = LB.find(x=>x.n===n);
+  const out = document.getElementById('rc');
+  if(!b){ out.innerHTML = '<div class="empty">Seleccioná un lote</div>'; return; }
+  out.innerHTML = '<div class="empty">Buscando recibos...</div>';
+  try{
+    const q = query(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), where('lote','==', b.l));
+    const snap = await getDocs(q);
+    const recibos = [];
+    snap.forEach(d=>recibos.push({...d.data(), _id:d.id}));
+    if(!recibos.length){ out.innerHTML = '<div class="empty">Este lote todavía no tiene ningún recibo digital generado.</div>'; return; }
+    recibos.sort((a,b)=>(parseInt(b.recibo)||0)-(parseInt(a.recibo)||0));
+    window._recibosLoteActual = recibos;
+    out.innerHTML = `<div class="card" style="padding:8px">
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">${b.l} — ${b.p}: ${recibos.length} recibo${recibos.length===1?'':'s'} digital${recibos.length===1?'':'es'}</div>
+      ${recibos.map((r,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #eee;font-size:12px">
+          <span>${r.anulado?'🚫 ':''}N.º ${String(r.recibo).padStart(4,'0')} · ${r.fecha||'—'} · ${fa(r.total||0)}</span>
+          <button class="btn-sm" style="width:auto;padding:4px 10px" onclick="reimprimirReciboDigital(${i})">👁️ Ver</button>
+        </div>`).join('')}
+    </div>`;
+  }catch(e){
+    out.innerHTML = `<div class="empty">Error al buscar: ${e.message}</div>`;
+  }
+};
+
+// Reconstruye el PDF real (mismo diseño con QR/firma) a partir de un
+// documento ya guardado en RECIBOS, para poder verlo/reimprimirlo/mandarlo
+// de nuevo sin tener que volver a cargar el cobro.
+window.reimprimirReciboDigital = (idx) => {
+  const r = window._recibosLoteActual && window._recibosLoteActual[idx];
+  if(!r) return;
+  const out = document.getElementById('rc');
+  const loteInfo = { l:r.lote, p:r.propietario };
+  const cobro = { monto:r.total, forma:r.forma, fecha:r.fecha, lemon:r.lemon||'' };
+  // El documento RECIBOS no guarda quién firmó — se infiere por nombre de
+  // quien lo generó, ya que ambos administradores usan su propia firma.
+  let firmanteId = '';
+  if(r.generadoPor){
+    const gp = r.generadoPor.toLowerCase();
+    if(gp.includes('walter')) firmanteId = 'wvallejo';
+    else if(gp.includes('juan')) firmanteId = 'jponce';
+  }
+  const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'' };
+  try{
+    const pdfDoc = construirPDFRecibo(meta, loteInfo, r.conceptos||[], cobro);
+    const filename = `Recibo_${r.recibo}_${(r.propietario||'').replace(/\s+/g,'_')}.pdf`;
+    const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
+    const resumenTexto = `Recibo N.º ${r.recibo} — ${r.lote} — ${r.propietario} — Total: $${Math.round(r.total||0).toLocaleString('es-AR')}`;
+    window['_pdfReimpreso'] = pdfDoc;
+    out.innerHTML = `
+      <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px">
+        <div style="font-size:12px;font-weight:700;color:#1a7a4a;margin-bottom:6px">🧾 Recibo N.º ${r.recibo}${r.anulado?' — 🚫 ANULADO':''}</div>
+        <iframe src="${blobUrl}" style="width:100%;height:260px;border:1px solid #ddd;border-radius:6px"></iframe>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" class="btn-sm" style="flex:1" onclick="window.open('${blobUrl}','_blank')">👁️ Ver</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#1565c0;color:#fff;border:none" onclick="imprimirPDF(window._pdfReimpreso)">🖨️ Imprimir</button>
+          <button type="button" class="btn-sm" style="flex:1;background:#25d366;color:#fff;border:none" onclick='compartirReciboWhatsapp(window._pdfReimpreso, "${filename}", ${JSON.stringify(resumenTexto)})'>📱 WhatsApp</button>
+        </div>
+      </div>`;
+  }catch(e){
+    out.innerHTML = `<div class="empty">Error al armar el PDF: ${e.message}</div>`;
+  }
 };
 
 // Poblar select intereses
