@@ -1948,7 +1948,9 @@ window.corregirReciboDuplicadoGenerico = async () => {
     const ok = confirm(`¿Confirmás mover el recibo de ${elegidoR.lote} — ${elegidoR.propietario} del N.º ${numero} al N.º ${proximoLibre}?`);
     if(!ok) return;
 
-    await updateDoc(doc(db, 'RECIBOS', elegidoR.id), {recibo: proximoLibre});
+    const codigoNuevo = `LP-${proximoLibre}-${_codigoAleatorio(4)}`;
+    const urlVerificacionNueva = `${location.origin}${location.pathname}#verificar/${codigoNuevo}`;
+    await updateDoc(doc(db, 'RECIBOS', elegidoR.id), {recibo: proximoLibre, codigo: codigoNuevo, urlVerificacion: urlVerificacionNueva});
 
     // Buscar el/los cobro(s) de ese lote y mes con monto parecido, para
     // sincronizar el campo "recibo" del cobro si hay un único candidato claro.
@@ -4284,7 +4286,7 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
       conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
-      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA,
+      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA, obs:cobro.obs||'',
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
       cobroId:cobroId||'', cobroColeccion:cobroColeccion||''
     };
@@ -4688,7 +4690,7 @@ window.reimprimirReciboDigital = (idx) => {
   if(!r) return;
   const out = document.getElementById('rc');
   const loteInfo = { l:r.lote, p:r.propietario };
-  const cobro = { monto:r.total, forma:r.forma, fecha:r.fecha, lemon:r.lemon||'' };
+  const cobro = { monto:r.total, forma:r.forma, fecha:r.fecha, lemon:r.lemon||'', obs:r.obs||'' };
   // El documento RECIBOS no guarda quién firmó — se infiere por nombre de
   // quien lo generó, ya que ambos administradores usan su propia firma.
   let firmanteId = '';
