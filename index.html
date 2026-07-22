@@ -406,7 +406,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <div id="pnl-rend" class="pnl">
   <div id="rend-alerta-recibos"></div>
   <button class="btn-sm" style="width:100%;background:#fff;border-color:#8a6d1a;color:#8a6d1a;margin-bottom:10px" onclick="marcarRecibosManualesDelMes()">📝 Marcar como manuales los recibos en papel de este mes</button>
-  <button class="btn-sm" style="width:100%;background:#fff;border-color:#e53935;color:#e53935;margin-bottom:10px" onclick="corregirReciboDuplicado503()">🔧 Corregir recibo N.º 530 duplicado (L6 Sur)</button>
+  <button class="btn-sm" style="width:100%;background:#fff;border-color:#e53935;color:#e53935;margin-bottom:10px" onclick="corregirReciboDuplicadoGenerico()">🔧 Corregir un número de recibo duplicado</button>
   <div class="card" style="padding:10px 12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
@@ -1896,65 +1896,71 @@ window.marcarRecibosManualesDelMes = async () => {
   }
 };
 
-// Corrección puntual de un caso concreto (21/07/2026): el recibo N.º 503 se
-// generó duplicado por el bug del número tipeado a mano (ver comentario en
-// generarReciboDigital) — ya estaba usado por L39 Norte (Acuna Jose,
-// 14/07/2026) y se repitió hoy para L6 Sur (Campos Fernando David). Este
-// botón renumera ESE caso puntual al próximo número REALMENTE libre (lo
-// calcula al momento de tocarlo). Versión 2 (21/07/2026, tarde): la primera
-// corrida cambió el número en RECIBOS pero NO encontró el cobro en C_202607
-// para sincronizarlo (por eso siguió apareciendo "—" en el informe) — y ese
-// número (530) mientras tanto lo tomó otro recibo real (L14 Sur). Esta
-// versión vuelve a mover el número al próximo libre real y es más flexible
-// buscando el cobro (por lote solamente, sin exigir un monto exacto, y
-// mostrando en el mensaje TODOS los cobros de L6 Sur que encuentre para
-// poder confirmar a mano si hace falta).
-window.corregirReciboDuplicado503 = async () => {
+// Herramienta genérica (21/07/2026) para corregir cualquier número de recibo
+// duplicado — reemplaza el fix puntual del caso 503/530 (ya resuelto). Pide
+// el número, muestra todos los documentos de RECIBOS que lo usan (con
+// lote/propietario/fecha) para decidir cuál está mal, y renumera el elegido
+// al próximo número realmente libre. Si encuentra un único cobro de ese
+// lote con monto parecido, sincroniza también el campo "recibo" del cobro.
+window.corregirReciboDuplicadoGenerico = async () => {
+  const numeroStr = prompt('¿Qué número de recibo está duplicado? (ej: 502)');
+  const numero = parseInt(numeroStr);
+  if(isNaN(numero)){ return; }
   try {
     const snapTodos = await getDocs(collection(db, 'RECIBOS'));
     let max = 0;
-    snapTodos.forEach(d=>{ const n = parseInt(d.data().recibo); if(!isNaN(n) && n>max) max = n; });
+    const coincidencias = [];
+    snapTodos.forEach(d=>{
+      const data = d.data();
+      const n = parseInt(data.recibo);
+      if(!isNaN(n) && n>max) max = n;
+      if(n===numero) coincidencias.push({id:d.id, ...data});
+    });
+    if(coincidencias.length<2){
+      toast(`⚠️ El N.º ${numero} aparece ${coincidencias.length} vez en RECIBOS — no está duplicado`);
+      return;
+    }
+    const opciones = coincidencias.map((r,i)=>`${i+1}) ${r.lote} — ${r.propietario} · ${r.fecha||'—'} · $${Math.round(r.total||0).toLocaleString('es-AR')}${r.anulado?' (anulado)':''}`).join('\n');
+    const elegido = prompt(`El N.º ${numero} está usado por estos recibos:\n\n${opciones}\n\n¿Cuál de ellos hay que RENUMERAR (escribí el número de la lista)? El resto queda como está.`);
+    const idx = parseInt(elegido) - 1;
+    if(isNaN(idx) || !coincidencias[idx]) return;
+    const elegidoR = coincidencias[idx];
     const proximoLibre = max + 1;
 
-    const ok = confirm(`Esto mueve el recibo N.º 530 de L6 Sur (Campos Fernando David) al próximo número libre, que ahora mismo es el N.º ${proximoLibre}. ¿Confirmás?`);
+    const ok = confirm(`¿Confirmás mover el recibo de ${elegidoR.lote} — ${elegidoR.propietario} del N.º ${numero} al N.º ${proximoLibre}?`);
     if(!ok) return;
 
-    const qR = query(collection(db, 'RECIBOS'), where('codigo','==','LP-503-YT9K'));
-    const snapR = await getDocs(qR);
-    let reciboCorregido = false;
-    for(const d of snapR.docs){ await updateDoc(doc(db, 'RECIBOS', d.id), {recibo: proximoLibre}); reciboCorregido = true; }
+    await updateDoc(doc(db, 'RECIBOS', elegidoR.id), {recibo: proximoLibre});
 
-    // Buscar el cobro de L6 Sur SOLO por lote (sin exigir monto exacto),
-    // para no volver a fallar si el monto guardado difiere un poco.
-    const snapC = await getDocs(collection(db, 'C_202607'));
-    const candidatosL6 = [];
-    snapC.forEach(d=>{
-      const data = d.data();
-      if(parseInt(data.n)===6 || String(data.n)==='6') candidatosL6.push({id:d.id, monto:data.monto, recibo:data.recibo, fecha:data.fecha});
-    });
-
+    // Buscar el/los cobro(s) de ese lote y mes con monto parecido, para
+    // sincronizar el campo "recibo" del cobro si hay un único candidato claro.
     let corregidosCobro = 0;
-    if(candidatosL6.length===1){
-      await updateDoc(doc(db, 'C_202607', candidatosL6[0].id), {recibo: proximoLibre});
-      corregidosCobro = 1;
-    } else if(candidatosL6.length>1){
-      // Más de un cobro este mes para L6 Sur: actualizar el que tenga
-      // monto más cercano a $136.540 (el de este recibo), no todos.
-      candidatosL6.sort((a,b)=>Math.abs((a.monto||0)-136540) - Math.abs((b.monto||0)-136540));
-      await updateDoc(doc(db, 'C_202607', candidatosL6[0].id), {recibo: proximoLibre});
-      corregidosCobro = 1;
+    if(elegidoR.mes){
+      const colMes = 'C_' + elegidoR.mes.replace('-','');
+      const loteInfo = LB.find(x=>x.l===elegidoR.lote);
+      if(loteInfo){
+        const snapC = await getDocs(collection(db, colMes));
+        const candidatos = [];
+        snapC.forEach(d=>{
+          const data = d.data();
+          if(parseInt(data.n)===loteInfo.n) candidatos.push({id:d.id, monto:data.monto});
+        });
+        if(candidatos.length){
+          candidatos.sort((a,b)=>Math.abs((a.monto||0)-(elegidoR.total||0)) - Math.abs((b.monto||0)-(elegidoR.total||0)));
+          await updateDoc(doc(db, colMes, candidatos[0].id), {recibo: proximoLibre});
+          corregidosCobro = 1;
+        }
+      }
     }
 
-    const detalleCobros = candidatosL6.length
-      ? ` · cobros de L6 Sur encontrados: ${candidatosL6.map(c=>`$${c.monto} (recibo actual: ${c.recibo||'vacío'})`).join(', ')}`
-      : ' · no encontré NINGÚN cobro de L6 Sur en C_202607 este mes';
-    toast(`✅ ${reciboCorregido?`RECIBOS corregido a N.º ${proximoLibre}`:'⚠️ No encontré LP-503-YT9K en RECIBOS'}${corregidosCobro?` · cobro actualizado a N.º ${proximoLibre}`:''}${detalleCobros}`);
-    registrarActividad(`Corrigió el recibo duplicado N.º 530 (L6 Sur) a N.º ${proximoLibre}`);
+    toast(`✅ Recibo de ${elegidoR.lote} movido a N.º ${proximoLibre}${corregidosCobro?' · cobro sincronizado':' · revisá el cobro a mano si hace falta'}`);
+    registrarActividad(`Corrigió recibo duplicado N.º ${numero} (${elegidoR.lote}) a N.º ${proximoLibre}`);
     verificarCorrelatividadRecibos();
   } catch(e){
     toast('❌ Error: '+e.message);
   }
 };
+
 
 // ── INICIO (portada / dashboard) ──
 function renderInicio(){
