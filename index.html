@@ -406,6 +406,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <div id="pnl-rend" class="pnl">
   <div id="rend-alerta-recibos"></div>
   <button class="btn-sm" style="width:100%;background:#fff;border-color:#8a6d1a;color:#8a6d1a;margin-bottom:10px" onclick="marcarRecibosManualesDelMes()">📝 Marcar como manuales los recibos en papel de este mes</button>
+  <button class="btn-sm" style="width:100%;background:#fff;border-color:#e53935;color:#e53935;margin-bottom:10px" onclick="corregirReciboDuplicado503()">🔧 Corregir recibo N.º 503 duplicado (L6 Sur → 530)</button>
   <div class="card" style="padding:10px 12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
@@ -1864,6 +1865,40 @@ window.marcarRecibosManualesDelMes = async () => {
   } catch(e){
     console.error(e);
     toast('❌ Error marcando recibos manuales: '+e.message);
+  }
+};
+
+// Corrección puntual de un caso concreto (21/07/2026): el recibo N.º 503 se
+// generó duplicado por el bug del número tipeado a mano (ver comentario en
+// generarReciboDigital) — ya estaba usado por L39 Norte (Acuna Jose,
+// 14/07/2026) y se repitió hoy para L6 Sur (Campos Fernando David). Este
+// botón renumera ESE caso puntual a 530 (siguiente número real libre),
+// tanto en el documento de RECIBOS (código LP-503-YT9K) como en el cobro
+// correspondiente de julio — para no depender de editar Firestore a mano
+// desde el celu. Es un arreglo de un solo uso, no una función general.
+window.corregirReciboDuplicado503 = async () => {
+  const ok = confirm('Esto cambia el recibo N.º 503 de L6 Sur (Campos Fernando David) al número correcto 530, tanto en RECIBOS como en el cobro de julio. ¿Confirmás?');
+  if(!ok) return;
+  try {
+    const qR = query(collection(db, 'RECIBOS'), where('codigo','==','LP-503-YT9K'));
+    const snapR = await getDocs(qR);
+    if(snapR.empty){ toast('⚠️ No encontré el recibo LP-503-YT9K en RECIBOS — puede que ya esté corregido'); return; }
+    for(const d of snapR.docs){ await updateDoc(doc(db, 'RECIBOS', d.id), {recibo: 530}); }
+
+    const snapC = await getDocs(collection(db, 'C_202607'));
+    let corregidosCobro = 0;
+    for(const d of snapC.docs){
+      const data = d.data();
+      if(parseInt(data.n)===6 && parseInt(data.recibo)===503){
+        await updateDoc(doc(db, 'C_202607', d.id), {recibo: 530});
+        corregidosCobro++;
+      }
+    }
+    toast(`✅ Corregido a N.º 530${corregidosCobro?` (y ${corregidosCobro} cobro(s) de L6 Sur actualizado(s))`:' — revisá el cobro de L6 Sur a mano si no aparece corregido'}`);
+    registrarActividad('Corrigió el recibo duplicado N.º 503 (L6 Sur) a N.º 530');
+    verificarCorrelatividadRecibos();
+  } catch(e){
+    toast('❌ Error: '+e.message);
   }
 };
 
