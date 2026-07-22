@@ -592,6 +592,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <div id="abg-lista-view">
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button class="btn az" onclick="abrirNuevoAcuerdo()" style="width:auto;padding:8px 16px">➕ Nuevo acuerdo</button>
+      <button class="btn-sm" onclick="cargarAcuerdoBrianLane()" style="width:auto;padding:8px 16px;background:#fff;border-color:#8a6d1a;color:#8a6d1a">🌱 Cargar caso Brian Lane Wilde</button>
     </div>
     <div class="g2">
       <div class="met"><div class="ml">Acuerdos vigentes</div><div class="mv vd" id="abg-cnt-vig">—</div></div>
@@ -6000,6 +6001,41 @@ window.borrarAcuerdo = async () => {
   toast('🗑️ Acuerdo eliminado');
   cerrarDetalleAcuerdo();
 };
+// Carga de un solo uso (22/07/2026) para no depender del formulario a mano:
+// crea directo el acuerdo real de Brian Lane Wilde (L28 Sur) con la Cuota 1
+// ya marcada como pagada aparte (recibo en papel N° 0001-000001, 22/07/2026),
+// sin generar un cobro nuevo. Una vez cargado, este botón ya no hace falta.
+window.cargarAcuerdoBrianLane = async () => {
+  const lote = 'L28 Sur';
+  const loteInfo = LB.find(x=>x.l===lote);
+  if(!loteInfo){ toast('⚠️ No encontré el lote L28 Sur en LB — revisá el nombre exacto'); return; }
+  if(!confirm(`¿Cargar el acuerdo de ${lote} — ${loteInfo.p} (Silvetti, Res. 002/2026, 3 cuotas de $132.084, cuota 1 ya pagada 22/07/2026)?`)) return;
+  try{
+    const cuotas = calcularCuotasAcuerdo(3, 132084, '2026-07');
+    cuotas[0].estado = 'pagada';
+    cuotas[0].fechaPago = '2026-07-22';
+    cuotas[0].cobradaAparte = true;
+    const acuerdo = {
+      lote,
+      propietario: loteInfo.p,
+      letrado: 'Dr. Gustavo Jorge Silvetti',
+      fechaIntimacion: '2026-07-03',
+      resolucion: '002/2026',
+      deudaIntimar: 396254,
+      deudaIncluye: 'Expensas ordinarias (mayo-junio 2026) y extraordinarias (abril-junio 2026), con intereses punitorios Art. 8 calculados al 2/7/2026',
+      cuotas,
+      incumplido: false,
+      fechaCreacion: new Date().toISOString().slice(0,10)
+    };
+    await setDoc(doc(db, colAcuerdos(), lote.replace(/\s+/g,'_')+'_'+Date.now()), acuerdo);
+    toast('✅ Acuerdo de Brian Lane Wilde cargado');
+    registrarActividad('Cargó el acuerdo con abogado de L28 Sur (Brian Lane Wilde)');
+    cargarAcuerdos();
+  }catch(e){
+    toast('❌ Error: '+e.message);
+  }
+};
+
 // ========== FIN ACUERDOS CON ABOGADO ==========
 
 // INIT
