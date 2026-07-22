@@ -4167,15 +4167,30 @@ window.enviarReciboWhatsappDirecto = async (tel, numero, fecha, monto, propietar
     const file = new File([blob], filename, {type:'application/pdf'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{
+        // El share nativo ya incluye el archivo Y el texto/destinatario en un
+        // solo paso — si funciona, no hace falta (ni conviene) abrir wa.me
+        // después, porque tras el "await" el navegador puede bloquear esa
+        // ventana emergente sin avisar.
         await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:msg});
-        compartioArchivo = true;
-      }catch(e){ /* canceló o falló: seguimos igual */ }
-    } else {
-      pdfDoc.save(filename);
+        toast('✅ Compartido');
+        return;
+      }catch(e){ /* canceló o falló: seguimos con el fallback de abajo */ }
     }
+    pdfDoc.save(filename);
   }
-  const textoWa = compartioArchivo ? msg : msg + '\n(Adjuntá el PDF que se acaba de descargar/compartir)';
-  window.open(`https://wa.me/${telLimpio}?text=${encodeURIComponent(textoWa)}`, '_blank');
+  // Fallback (sin share nativo, o el usuario lo canceló): descargamos el PDF
+  // y dejamos que ella misma toque el link de WhatsApp — abrirlo nosotros acá
+  // por código, después de haber hecho un "await" más arriba, se bloquea en
+  // Chrome/Android sin avisar. Un link tocado a mano siempre funciona.
+  toast('📄 PDF descargado — tocá el link de abajo para abrir WhatsApp y adjuntalo vos');
+  const textoWa = msg + '\n(Adjuntá el PDF que se acaba de descargar)';
+  const out = document.getElementById('recibo-digital-out');
+  if(out){
+    const div = document.createElement('div');
+    div.style.marginTop = '8px';
+    div.innerHTML = `<a href="https://wa.me/${telLimpio}?text=${encodeURIComponent(textoWa)}" target="_blank" style="display:block;text-align:center;background:#25d366;color:#fff;padding:10px;border-radius:8px;font-weight:700;text-decoration:none;font-size:13px">📱 Tocá para abrir WhatsApp</a>`;
+    out.appendChild(div);
+  }
 };
 
 
@@ -4189,14 +4204,25 @@ async function compartirReciboWhatsapp(pdfDoc, filename, resumenTexto){
       try{
         await navigator.share({files:[file], title:'Recibo Barrio Las Palmas', text:resumenTexto});
         return;
-      }catch(e){ /* usuario canceló o falló: cae al fallback */ }
+      }catch(e){ /* usuario canceló o falló: cae al fallback de descarga */ }
     }
+    // No se intenta abrir WhatsApp automáticamente acá: después de un
+    // "await" (arriba), el navegador ya no lo cuenta como una acción directa
+    // del usuario y bloquea la ventana emergente sin avisar — por eso antes
+    // parecía que "no pasaba nada". Se descarga el PDF y se deja un link
+    // para que ella misma lo toque (eso sí funciona siempre).
     pdfDoc.save(filename);
-    toast('📄 PDF descargado — adjuntalo manualmente en WhatsApp desde tus Descargas');
-    const wa = 'https://wa.me/?text=' + encodeURIComponent(resumenTexto + '\n(Adjuntá el PDF que se acaba de descargar)');
-    window.open(wa, '_blank');
+    toast('📄 PDF descargado — tocá el link de abajo para abrir WhatsApp y adjuntalo vos');
+    const texto = resumenTexto + '\n(Adjuntá el PDF que se acaba de descargar)';
+    const out = document.getElementById('recibo-digital-out') || document.getElementById('rc');
+    if(out){
+      const div = document.createElement('div');
+      div.style.marginTop = '8px';
+      div.innerHTML = `<a href="https://wa.me/?text=${encodeURIComponent(texto)}" target="_blank" style="display:block;text-align:center;background:#25d366;color:#fff;padding:10px;border-radius:8px;font-weight:700;text-decoration:none;font-size:13px">📱 Tocá para abrir WhatsApp</a>`;
+      out.appendChild(div);
+    }
   }catch(e){
-    toast('❌ Error al compartir: '+e.message+' — probá descargarlo con el botón Imprimir/PDF');
+    toast('❌ Error al compartir: '+e.message+' — probá con el botón Imprimir/PDF');
   }
 }
 
