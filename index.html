@@ -197,6 +197,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" data-tab="deu" onclick="ST('deu',this)">⚠️ Deudores</button>
   <button class="tab" data-tab="gc" onclick="ST('gc',this)">📢 Gestión de cobranza</button>
   <button class="tab" data-tab="plan" onclick="ST('plan',this)">📑 Planes de pago</button>
+  <button class="tab" data-tab="abg" onclick="ST('abg',this)">⚖️ Acuerdos abogado</button>
   <button class="tab" data-tab="int" onclick="ST('int',this)">📐 Calcular intereses</button>
   <button class="tab" data-tab="est" onclick="ST('est',this)">📊 Resumen financiero</button>
   <button class="tab" data-tab="rec" onclick="ST('rec',this)">🧾 Ver recibos</button>
@@ -582,6 +583,89 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <div id="np-preview" style="font-size:11px;color:#888;margin-bottom:8px"></div>
       <button class="btn" onclick="guardarNuevoPlan()">Guardar plan</button>
       <button class="btn gr" onclick="document.getElementById('modal-nuevo-plan').style.display='none'">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACUERDOS CON ABOGADO -->
+<div id="pnl-abg" class="pnl">
+  <div id="abg-lista-view">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn az" onclick="abrirNuevoAcuerdo()" style="width:auto;padding:8px 16px">➕ Nuevo acuerdo</button>
+    </div>
+    <div class="g2">
+      <div class="met"><div class="ml">Acuerdos vigentes</div><div class="mv vd" id="abg-cnt-vig">—</div></div>
+      <div class="met"><div class="ml">En riesgo</div><div class="mv nj" id="abg-cnt-riesgo">—</div></div>
+      <div class="met"><div class="ml">Incumplidos</div><div class="mv rj" id="abg-cnt-caidos">—</div></div>
+    </div>
+    <div id="lista-acuerdos"></div>
+  </div>
+
+  <div id="abg-detalle-view" style="display:none">
+    <button class="btn-sm" onclick="cerrarDetalleAcuerdo()" style="margin-bottom:10px">← Volver</button>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="ct" id="ad-nombre" style="margin-bottom:2px"></div>
+          <div style="font-size:11px;color:#888" id="ad-sub"></div>
+        </div>
+        <span id="ad-badge" style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap"></span>
+      </div>
+      <div style="background:#f7f7f7;border-radius:8px;padding:8px 10px;margin-top:8px;font-size:12px">
+        <div style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px">Deuda incluida en este acuerdo</div>
+        <div id="ad-deuda-incluye"></div>
+      </div>
+      <div id="ad-alerta"></div>
+      <div class="tbl" style="margin-top:10px">
+        <table>
+          <thead><tr><th>Cuota</th><th>Vence</th><th class="num">Importe</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="ad-cuotas"></tbody>
+        </table>
+      </div>
+      <button class="btn-sm btn-dl" onclick="borrarAcuerdo()" style="margin-top:10px">🗑️ Eliminar acuerdo</button>
+    </div>
+  </div>
+
+  <!-- Modal nuevo acuerdo -->
+  <div id="modal-nuevo-acuerdo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto">
+    <div style="background:#fff;border-radius:12px;padding:16px;margin:30px auto;max-width:420px">
+      <div class="ct">⚖️ Nuevo acuerdo con abogado</div>
+      <div class="fg"><label>Lote</label><select id="na-lote"></select></div>
+      <div class="fg"><label>Letrado interviniente</label>
+        <select id="na-letrado">
+          <option>Dr. Gustavo Jorge Silvetti</option>
+          <option>Dr. Carlos Héctor Ortega</option>
+        </select>
+      </div>
+      <div class="fg"><label>Fecha de intimación</label><input type="date" id="na-fecha-intimacion"></div>
+      <div class="fg"><label>N° Resolución Administrativa</label><input type="text" id="na-resolucion" placeholder="002/2026"></div>
+      <div class="fg"><label>Deuda al momento de intimar ($)</label><input type="number" id="na-deuda-intimar" placeholder="396254"></div>
+      <div class="fg"><label>¿Hasta qué deuda incluye este acuerdo?</label>
+        <textarea id="na-deuda-incluye" rows="2" placeholder="Ej: incluye expensas ordinarias y extraordinarias con más intereses punitorios hasta junio 2026 inclusive." style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;font-size:13px"></textarea>
+      </div>
+      <div class="fg"><label>Cantidad de cuotas</label><input type="number" id="na-cant-cuotas" placeholder="3" min="1"></div>
+      <div class="fg"><label>Importe de cada cuota ($)</label><input type="number" id="na-monto-cuota" placeholder="132084"></div>
+      <div class="fg"><label>Mes de la 1° cuota</label><input type="month" id="na-mes-inicio"></div>
+      <div id="na-preview" style="font-size:11px;color:#888;margin-bottom:8px"></div>
+      <button class="btn" onclick="guardarNuevoAcuerdo()">Guardar acuerdo</button>
+      <button class="btn gr" onclick="document.getElementById('modal-nuevo-acuerdo').style.display='none'">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal cobrar cuota de acuerdo -->
+  <div id="modal-cobrar-cuota-abg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto">
+    <div style="background:#fff;border-radius:12px;padding:16px;margin:30px auto;max-width:420px">
+      <div class="ct" id="cca-titulo">💰 Cobrar cuota</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px" id="cca-sub"></div>
+      <div class="fg"><label>Fecha del pago</label><input type="date" id="cca-fecha"></div>
+      <div class="fg"><label>Forma</label><select id="cca-forma"><option>Efectivo</option><option>Transferencia</option><option>Débito</option></select></div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0">
+        <input type="checkbox" id="cca-recibo-digital" checked style="width:16px;height:16px">
+        <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR)</span>
+      </label>
+      <button class="btn" id="btn-cca" onclick="cobrarCuotaAcuerdo()">✓ Registrar cobro</button>
+      <button class="btn gr" onclick="document.getElementById('modal-cobrar-cuota-abg').style.display='none'">Cancelar</button>
+      <div id="cca-recibo-out"></div>
     </div>
   </div>
 </div>
@@ -1046,6 +1130,7 @@ window.ST = (n,el)=>{
   if(n==='rend') renderRend();
   if(n==='conc') renderConc();
   if(n==='plan') cargarPlanes();
+  if(n==='abg') cargarAcuerdos();
   if(n==='ini') { renderInicio(); renderComparativo(); }
   if(n==='cob' || n==='rend') verificarCorrelatividadRecibos();
   if(n==='gc') renderGestionCobranza();
@@ -5609,6 +5694,313 @@ window.borrarPlan = async () => {
   cerrarDetallePlan();
 };
 // ========== FIN PLANES DE PAGO ==========
+
+// ========== ACUERDOS CON ABOGADO ==========
+// Igual espíritu que Planes de pago, pero para acuerdos negociados vía el
+// letrado tras una intimación extrajudicial: cuotas libres (no una fórmula
+// fija de 18), con datos legales (letrado, N° Resolución Administrativa,
+// fecha de intimación) y una descripción explícita de hasta qué deuda
+// cubre el acuerdo (para no confundirla con deuda posterior no incluida).
+function colAcuerdos(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'ACUERDOS_ABOGADO'; }
+
+let ACUERDOS = [];
+let _acuerdoActualId = null;
+
+window.abrirNuevoAcuerdo = () => {
+  const sel = document.getElementById('na-lote');
+  sel.innerHTML = LB.map(l=>`<option value="${l.l}">${l.l} — ${l.p}</option>`).join('');
+  document.getElementById('na-letrado').value = 'Dr. Gustavo Jorge Silvetti';
+  document.getElementById('na-fecha-intimacion').value = new Date().toISOString().slice(0,10);
+  document.getElementById('na-resolucion').value = '';
+  document.getElementById('na-deuda-intimar').value = '';
+  document.getElementById('na-deuda-incluye').value = '';
+  document.getElementById('na-cant-cuotas').value = '3';
+  document.getElementById('na-monto-cuota').value = '';
+  document.getElementById('na-mes-inicio').value = MES;
+  document.getElementById('na-preview').textContent = '';
+  document.getElementById('modal-nuevo-acuerdo').style.display = 'block';
+};
+
+function calcularCuotasAcuerdo(cantidad, montoCuota, mesInicioStr){
+  const cuotas = [];
+  const [y0,m0] = mesInicioStr.split('-').map(Number);
+  for(let i=0;i<cantidad;i++){
+    const idx = m0-1+i;
+    const y = y0 + Math.floor(idx/12);
+    const m = idx%12;
+    cuotas.push({
+      n: i+1,
+      vencimiento: `${y}-${String(m+1).padStart(2,'0')}-15`,
+      importe: Math.round(montoCuota),
+      estado: 'pendiente', // pendiente | pagada | vencida
+      fechaPago: null
+    });
+  }
+  return cuotas;
+}
+
+window.guardarNuevoAcuerdo = async () => {
+  const lote = document.getElementById('na-lote').value;
+  const letrado = document.getElementById('na-letrado').value;
+  const fechaIntimacion = document.getElementById('na-fecha-intimacion').value;
+  const resolucion = document.getElementById('na-resolucion').value.trim();
+  const deudaIntimar = parseFloat(document.getElementById('na-deuda-intimar').value) || 0;
+  const deudaIncluye = document.getElementById('na-deuda-incluye').value.trim();
+  const cantCuotas = parseInt(document.getElementById('na-cant-cuotas').value);
+  const montoCuota = parseFloat(document.getElementById('na-monto-cuota').value);
+  const mesInicio = document.getElementById('na-mes-inicio').value;
+  if(!lote || !cantCuotas || !montoCuota || !mesInicio){ toast('⚠️ Completá lote, cantidad de cuotas, importe y mes de inicio'); return; }
+  const loteInfo = LB.find(x=>x.l===lote);
+  const cuotas = calcularCuotasAcuerdo(cantCuotas, montoCuota, mesInicio);
+  const acuerdo = {
+    lote,
+    propietario: loteInfo ? loteInfo.p : '',
+    letrado, fechaIntimacion, resolucion,
+    deudaIntimar, deudaIncluye,
+    cuotas,
+    incumplido: false,
+    fechaCreacion: new Date().toISOString().slice(0,10)
+  };
+  await setDoc(doc(db, colAcuerdos(), lote.replace(/\s+/g,'_')+'_'+Date.now()), acuerdo);
+  toast('✅ Acuerdo creado · '+lote);
+  document.getElementById('modal-nuevo-acuerdo').style.display = 'none';
+  cargarAcuerdos();
+};
+
+async function cargarAcuerdos(){
+  const snap = await getDocs(collection(db, colAcuerdos()));
+  const hoy = new Date();
+  ACUERDOS = [];
+  for(const d of snap.docs){
+    const ac = {id:d.id, ...d.data()};
+    let cambio = false;
+    ac.cuotas.forEach(c=>{
+      if(c.estado==='pendiente' && new Date(c.vencimiento+'T23:59:59') < hoy){
+        c.estado = 'vencida';
+        cambio = true;
+      }
+    });
+    if(cambio){ await setDoc(doc(db, colAcuerdos(), ac.id), ac); }
+    ACUERDOS.push(ac);
+  }
+  renderAcuerdos();
+}
+
+function renderAcuerdos(){
+  const vigentes = ACUERDOS.filter(a=>!a.incumplido).length;
+  const incumplidos = ACUERDOS.filter(a=>a.incumplido).length;
+  const enRiesgo = ACUERDOS.filter(a=>!a.incumplido && a.cuotas.some(c=>c.estado==='vencida')).length;
+  document.getElementById('abg-cnt-vig').textContent = vigentes;
+  document.getElementById('abg-cnt-riesgo').textContent = enRiesgo;
+  document.getElementById('abg-cnt-caidos').textContent = incumplidos;
+
+  if(!ACUERDOS.length){
+    document.getElementById('lista-acuerdos').innerHTML = '<div class="empty">Todavía no hay acuerdos con abogado cargados</div>';
+    return;
+  }
+  document.getElementById('lista-acuerdos').innerHTML = ACUERDOS.map(a=>{
+    const pagadas = a.cuotas.filter(c=>c.estado==='pagada').length;
+    const riesgo = !a.incumplido && a.cuotas.some(c=>c.estado==='vencida');
+    const estado = a.incumplido ? 'pen' : (riesgo ? 'pen' : 'pag');
+    const badgeTxt = a.incumplido ? 'Incumplido' : (riesgo ? 'Cuota vencida' : 'Al día');
+    const badgeBg = a.incumplido ? '#fdecea' : (riesgo ? '#fff8e1' : '#e8f5e9');
+    const badgeCol = a.incumplido ? '#c62828' : (riesgo ? '#f57c00' : '#1a7a4a');
+    return `<div class="lc ${estado}" style="cursor:pointer" onclick="abrirDetalleAcuerdo('${a.id}')">
+      <div class="lc-top">
+        <div class="lc-left">
+          <div class="lc-name">${a.lote} — ${a.propietario}</div>
+          <div class="lc-sub"><span>${a.letrado||'—'}</span><span>${pagadas}/${a.cuotas.length} cuotas pagadas</span></div>
+        </div>
+        <span style="font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;white-space:nowrap;background:${badgeBg};color:${badgeCol}">${badgeTxt}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.abrirDetalleAcuerdo = (id) => {
+  _acuerdoActualId = id;
+  document.getElementById('abg-lista-view').style.display = 'none';
+  document.getElementById('abg-detalle-view').style.display = 'block';
+  renderDetalleAcuerdo();
+};
+
+window.cerrarDetalleAcuerdo = () => {
+  document.getElementById('abg-detalle-view').style.display = 'none';
+  document.getElementById('abg-lista-view').style.display = 'block';
+  cargarAcuerdos();
+};
+
+function renderDetalleAcuerdo(){
+  const a = ACUERDOS.find(x=>x.id===_acuerdoActualId);
+  if(!a) return;
+  document.getElementById('ad-nombre').textContent = a.lote + ' — ' + a.propietario;
+  document.getElementById('ad-sub').textContent = `${a.letrado||'—'}${a.resolucion?' · Res. Adm. '+a.resolucion:''}${a.fechaIntimacion?' · Intimado el '+a.fechaIntimacion:''}${a.deudaIntimar?' · Deuda al intimar: '+fa(a.deudaIntimar):''}`;
+  document.getElementById('ad-deuda-incluye').textContent = a.deudaIncluye || '(sin descripción cargada)';
+  const riesgo = !a.incumplido && a.cuotas.some(c=>c.estado==='vencida');
+  const badge = document.getElementById('ad-badge');
+  badge.textContent = a.incumplido ? 'Incumplido' : (riesgo ? 'Cuota vencida' : 'Al día');
+  badge.style.background = a.incumplido ? '#fdecea' : (riesgo ? '#fff8e1' : '#e8f5e9');
+  badge.style.color = a.incumplido ? '#c62828' : (riesgo ? '#f57c00' : '#1a7a4a');
+
+  const alerta = document.getElementById('ad-alerta');
+  if(a.incumplido){
+    alerta.innerHTML = `<div style="background:#fdecea;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #e53935">⚠️ Acuerdo marcado como incumplido — el caso vuelve a la vía extrajudicial/judicial con el letrado.</div>`;
+  } else if(riesgo){
+    alerta.innerHTML = `<div style="background:#fff8e1;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:11px;border-left:3px solid #f9a825">
+      ⚠️ Hay una cuota vencida sin pagar.
+      <button class="btn rj" style="margin-top:8px" onclick="confirmarIncumplimiento('${a.id}')">Marcar acuerdo como incumplido</button>
+    </div>`;
+  } else {
+    alerta.innerHTML = '';
+  }
+
+  document.getElementById('ad-cuotas').innerHTML = a.cuotas.map(c=>{
+    const colores = {pagada:'#1a7a4a', vencida:'#e53935', pendiente:'#888'};
+    const etiquetas = {pagada:'Pagada', vencida:'Vencida', pendiente:'Pendiente'};
+    let accion = '';
+    if(!a.incumplido && c.estado!=='pagada'){
+      accion = `<button class="btn-sm" onclick="abrirCobrarCuotaAcuerdo('${a.id}',${c.n})">Cobrar</button>
+        <button class="btn-sm" style="background:#fff;border-color:#888;color:#666;margin-top:4px" onclick="marcarCuotaYaCobradaAcuerdo('${a.id}',${c.n})">Ya cobrada aparte</button>`;
+    } else if(!a.incumplido && c.estado==='pagada'){
+      accion = `<button class="btn-sm" style="background:#fff;border-color:#c62828;color:#c62828" onclick="deshacerCuotaAcuerdo('${a.id}',${c.n})">↩️ Deshacer</button>`;
+    }
+    return `<tr>
+      <td>${c.n}/${a.cuotas.length}</td>
+      <td>${c.vencimiento}</td>
+      <td class="num">${fa(c.importe)}</td>
+      <td style="color:${colores[c.estado]};font-weight:700">${etiquetas[c.estado]}${c.fechaPago?' ('+c.fechaPago+')':''}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+window.confirmarIncumplimiento = async (acuerdoId) => {
+  const a = ACUERDOS.find(x=>x.id===acuerdoId);
+  if(!a) return;
+  if(!confirm(`¿Confirmás que ${a.lote} (${a.propietario}) incumplió el acuerdo con el abogado?\n\nEsto no revierte cobros ya cargados — solo marca el acuerdo como incumplido para que el letrado retome la vía extrajudicial/judicial.`)) return;
+  a.incumplido = true;
+  a.fechaIncumplimiento = new Date().toISOString().slice(0,10);
+  await setDoc(doc(db, colAcuerdos(), a.id), a);
+  toast(`⚠️ Acuerdo incumplido confirmado · ${a.lote}`);
+  registrarActividad(`Marcó como incumplido el acuerdo con abogado de ${a.lote} (${a.propietario})`);
+  renderDetalleAcuerdo();
+};
+
+// Para cuando el pago ya se registró de otra forma (ej. recibo en papel del
+// estudio jurídico, o ya cargado como cobro suelto antes de que existiera
+// esta pestaña) — solo marca la cuota como pagada acá, SIN crear un cobro
+// nuevo ni un recibo digital nuevo (evita duplicar el ingreso).
+window.marcarCuotaYaCobradaAcuerdo = async (acuerdoId, n) => {
+  const a = ACUERDOS.find(x=>x.id===acuerdoId);
+  const cuota = a && a.cuotas.find(c=>c.n===n);
+  if(!a || !cuota) return;
+  const fechaStr = prompt('¿Qué fecha figura como pagada esta cuota? (AAAA-MM-DD)', new Date().toISOString().slice(0,10));
+  if(!fechaStr) return;
+  cuota.estado = 'pagada';
+  cuota.fechaPago = fechaStr;
+  cuota.cobradaAparte = true;
+  await setDoc(doc(db, colAcuerdos(), a.id), a);
+  toast(`✅ Cuota ${n}/${a.cuotas.length} marcada como ya cobrada · ${a.lote}`);
+  registrarActividad(`Marcó como ya cobrada (sin generar cobro nuevo) la cuota ${n}/${a.cuotas.length} del acuerdo de ${a.lote} (${a.propietario})`);
+  renderDetalleAcuerdo();
+};
+
+let _cuotaAcuerdoACobrar = null; // {acuerdoId, n}
+window.abrirCobrarCuotaAcuerdo = (acuerdoId, n) => {
+  const a = ACUERDOS.find(x=>x.id===acuerdoId);
+  const cuota = a && a.cuotas.find(c=>c.n===n);
+  if(!a || !cuota) return;
+  _cuotaAcuerdoACobrar = {acuerdoId, n};
+  document.getElementById('cca-titulo').textContent = `💰 Cobrar cuota ${n}/${a.cuotas.length}`;
+  document.getElementById('cca-sub').textContent = `${a.lote} — ${a.propietario} · ${fa(cuota.importe)}`;
+  document.getElementById('cca-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cca-forma').value = 'Transferencia';
+  document.getElementById('cca-recibo-digital').checked = true;
+  document.getElementById('cca-recibo-out').innerHTML = '';
+  document.getElementById('modal-cobrar-cuota-abg').style.display = 'block';
+};
+
+// Igual que cobrarCuotaPlan: 1) marca la cuota pagada en ACUERDOS_ABOGADO,
+// 2) crea el cobro real del mes con concepto "Cuota Extrajudicial", 3) si
+// corresponde, genera el recibo digital citando el acuerdo/Resolución.
+window.cobrarCuotaAcuerdo = async () => {
+  if(!_cuotaAcuerdoACobrar) return;
+  const {acuerdoId, n} = _cuotaAcuerdoACobrar;
+  const a = ACUERDOS.find(x=>x.id===acuerdoId);
+  const cuota = a && a.cuotas.find(c=>c.n===n);
+  if(!a || !cuota) return;
+  const btn = document.getElementById('btn-cca');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const loteInfo = LB.find(x=>x.l===a.lote);
+    const fecha = document.getElementById('cca-fecha').value || new Date().toISOString().slice(0,10);
+    const forma = document.getElementById('cca-forma').value;
+    const acuerdoLabel = `Cuota ${n}/${a.cuotas.length} — Acuerdo Extrajudicial${a.resolucion?' (Res. Adm. '+a.resolucion+')':''}`;
+
+    const capitalPer = {otro: cuota.importe};
+    const interesPer = {};
+    const montoTotal = cuota.importe;
+
+    const cobro = {
+      n: loteInfo ? loteInfo.n : null,
+      conc: 'extrajudicial',
+      per: Object.keys(capitalPer),
+      monto: montoTotal,
+      interes: 0,
+      interesPer,
+      capitalPer,
+      forma,
+      recibo: '—',
+      fecha,
+      lemon: '',
+      comprobanteImg: '',
+      obs: acuerdoLabel,
+      acuerdoLabel,
+      acuerdoId: a.id,
+      acuerdoCuota: n
+    };
+    const cobroRef = await addDoc(collection(db, colC()), cobro);
+
+    cuota.estado = 'pagada';
+    cuota.fechaPago = fecha;
+    await setDoc(doc(db, colAcuerdos(), a.id), a);
+
+    toast(`✅ Cobro registrado · Cuota ${n}/${a.cuotas.length} · ${a.lote}`);
+    registrarActividad(`Cobró cuota ${n}/${a.cuotas.length} del acuerdo con abogado de ${a.lote} (${a.propietario}) · ${fa(cuota.importe)}`);
+
+    if(document.getElementById('cca-recibo-digital').checked){
+      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, acuerdoLabel, capitalPer, interesPer);
+    }
+    renderDetalleAcuerdo();
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
+  btn.disabled = false; btn.textContent = '✓ Registrar cobro';
+};
+
+window.deshacerCuotaAcuerdo = async (acuerdoId, n) => {
+  const a = ACUERDOS.find(x=>x.id===acuerdoId);
+  if(!a) return;
+  const cuota = a.cuotas.find(c=>c.n===n);
+  if(!cuota) return;
+  if(!confirm(`¿Deshacer la cuota ${n}/${a.cuotas.length} de ${a.lote}?\n\nOJO: esto solo la vuelve a "Pendiente" acá. Si ya generaste el cobro y/o el recibo digital, tenés que anularlos aparte.`)) return;
+  cuota.estado = 'pendiente';
+  cuota.fechaPago = null;
+  await setDoc(doc(db, colAcuerdos(), a.id), a);
+  toast(`↩️ Cuota ${n}/${a.cuotas.length} vuelta a pendiente · ${a.lote}`);
+  registrarActividad(`Deshizo la cuota ${n}/${a.cuotas.length} del acuerdo con abogado de ${a.lote} (${a.propietario})`);
+  renderDetalleAcuerdo();
+};
+
+window.borrarAcuerdo = async () => {
+  const a = ACUERDOS.find(x=>x.id===_acuerdoActualId);
+  if(!a) return;
+  if(!confirm(`¿Eliminar el acuerdo de ${a.lote}? Esta acción no se puede deshacer.`)) return;
+  await deleteDoc(doc(db, colAcuerdos(), a.id));
+  toast('🗑️ Acuerdo eliminado');
+  cerrarDetalleAcuerdo();
+};
+// ========== FIN ACUERDOS CON ABOGADO ==========
 
 // INIT
 if(location.hash.startsWith('#verificar/')){
