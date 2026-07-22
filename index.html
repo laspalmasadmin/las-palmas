@@ -201,6 +201,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" data-tab="est" onclick="ST('est',this)">📊 Resumen financiero</button>
   <button class="tab" data-tab="rec" onclick="ST('rec',this)">🧾 Ver recibos</button>
   <button class="tab" data-tab="conc" onclick="ST('conc',this)">🏦 Control bancario</button>
+  <button class="tab" data-tab="declp" onclick="ST('declp',this)">📥 Declaraciones</button>
   <button class="tab" data-tab="act" onclick="ST('act',this)">📜 Historial</button>
 </div>
 
@@ -723,6 +724,11 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <div id="conc-declaraciones"></div>
 </div>
 
+<!-- DECLARACIONES DE PAGO -->
+<div id="pnl-declp" class="pnl">
+  <div id="declp-lista"><div class="empty">Cargando...</div></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1042,6 +1048,7 @@ window.ST = (n,el)=>{
   if(n==='ini') { renderInicio(); renderComparativo(); }
   if(n==='cob' || n==='rend') verificarCorrelatividadRecibos();
   if(n==='gc') renderGestionCobranza();
+  if(n==='declp') renderDeclaracionesTab();
 };
 
 window.irATab = (n) => {
@@ -2034,6 +2041,7 @@ async function cargarDeclaraciones(){
   }
   renderDeclaracionesPendientes();
   renderConcDeclaraciones();
+  renderDeclaracionesTab();
 }
 
 function _buscarCobroParaDeclaracion(f){
@@ -2043,12 +2051,54 @@ function _buscarCobroParaDeclaracion(f){
   return candidatos[0] || null;
 }
 
+// Resumen compacto para Inicio — ya no lista cada declaración acá (se iba a
+// ir acumulando y ocupando mucho lugar visual); solo un total + botón que
+// lleva a la pestaña "📥 Declaraciones" con el detalle completo.
 function renderDeclaracionesPendientes(){
   const el = document.getElementById('ini-declaraciones');
   if(!el) return;
   if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
   const filas = DECLARACIONES_CACHE;
   if(!filas.length){ el.innerHTML=''; return; }
+  const nSinMatch = filas.filter(f=>!_buscarCobroParaDeclaracion(f)).length;
+  el.innerHTML = `<div class="card" style="border:1px solid #1565c0">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="ct" style="color:#1565c0;margin:0">📥 Pagos avisados por propietarios</div>
+      <b style="color:${nSinMatch?'#e53935':'#1a7a4a'}">${filas.length}${nSinMatch?` · ${nSinMatch} sin cobro`:''}</b>
+    </div>
+    <button class="btn-sm" style="width:100%;margin-top:8px;background:#fff;border-color:#1565c0;color:#1565c0" onclick="irATab('declp')">Ver detalle →</button>
+  </div>`;
+}
+
+// Ídem para Control bancario: antes mostraba la lista completa (con fotos)
+// acá abajo, ensuciando la pantalla — ahora solo un resumen + link a la
+// pestaña dedicada.
+function renderConcDeclaraciones(){
+  const el = document.getElementById('conc-declaraciones');
+  if(!el) return;
+  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
+  const filas = DECLARACIONES_CACHE;
+  if(!filas.length){ el.innerHTML=''; return; }
+  const sinCobro = filas.filter(f=>!_buscarCobroParaDeclaracion(f)).length;
+  el.innerHTML = `<div class="card" style="margin-top:8px;border:1px solid ${sinCobro?'#e53935':'#1a7a4a'}">
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+      <span style="font-weight:700;color:${sinCobro?'#e53935':'#1a7a4a'}">📋 Declaraciones vs. planilla de ingresos</span>
+      <b>${filas.length-sinCobro} de ${filas.length}${sinCobro?` · ${sinCobro} sin cargar`:''}</b>
+    </div>
+    <button class="btn-sm" style="width:100%;margin-top:6px;background:#fff;border-color:#1565c0;color:#1565c0" onclick="irATab('declp')">Ver detalle →</button>
+  </div>`;
+}
+
+// Pestaña propia "📥 Declaraciones": acá sí va el detalle completo, uno por
+// uno. La foto del comprobante NO se muestra directo (para no ocupar tanto
+// espacio a medida que se van acumulando) — solo un link para verla en
+// grande o descargarla cuando hace falta mirarla.
+function renderDeclaracionesTab(){
+  const el = document.getElementById('declp-lista');
+  if(!el) return;
+  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
+  const filas = DECLARACIONES_CACHE;
+  if(!filas.length){ el.innerHTML='<div class="empty">Todavía no hay ninguna declaración de pago avisada.</div>'; return; }
 
   const AHORA = Date.now();
   const filasHTML = filas.map(f=>{
@@ -2059,22 +2109,19 @@ function renderDeclaracionesPendientes(){
       ? `<span style="color:#1a7a4a;font-weight:700">✅ conciliado — cobro del ${match.fecha||'—'} por $${Math.round(match.monto).toLocaleString('es-AR')}</span>`
       : `<span style="color:${urgente?'#e53935':'#c78a1e'};font-weight:700">${urgente?'🔴':'⚠️'} sin cobro cargado todavía${diasSinMatch?` (hace ${diasSinMatch} día${diasSinMatch===1?'':'s'})`:''}</span>`;
     return `
-      <div style="border-top:1px solid #eee;padding:8px 0;font-size:12px">
+      <div class="card" style="padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between">
           <b>${f.lote} — ${f.propietario}</b>
           <b style="color:#1a7a4a">$${Math.round(f.monto).toLocaleString('es-AR')}</b>
         </div>
         <div style="color:#888;font-size:11px">${f.fecha} · ${f.forma}${f.obs?' · '+f.obs:''}</div>
-        <div style="margin-top:3px">${estadoHTML}</div>
+        <div style="margin-top:3px;font-size:12px">${estadoHTML}</div>
         ${f.comprobanteImg?`
-          <div style="margin-top:4px">
-            <img src="${f.comprobanteImg}" style="max-width:100px;border-radius:6px;display:block;border:1px solid #ddd;cursor:pointer" onclick='verFotoGrande("${f.comprobanteImg}")'>
-            <div style="display:flex;gap:10px;margin-top:3px">
-              <span onclick='verFotoGrande("${f.comprobanteImg}")' style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer">🔍 Ver en grande</span>
-              <a href="${f.comprobanteImg}" download="comprobante_${f.lote.replace(/\s+/g,'_')}_${(f.fecha||'').replace(/\//g,'-')}.jpg" style="font-size:11px;color:#1565c0;text-decoration:none;font-weight:700">⬇️ Descargar</a>
-            </div>
+          <div style="margin-top:5px;display:flex;gap:12px">
+            <span onclick='verFotoGrande("${f.comprobanteImg}")' style="font-size:11px;color:#1565c0;font-weight:700;cursor:pointer">📎 Ver comprobante</span>
+            <a href="${f.comprobanteImg}" download="comprobante_${f.lote.replace(/\s+/g,'_')}_${(f.fecha||'').replace(/\//g,'-')}.jpg" style="font-size:11px;color:#1565c0;text-decoration:none;font-weight:700">⬇️ Descargar</a>
           </div>`:''}
-        <div style="display:flex;gap:6px;margin-top:6px">
+        <div style="display:flex;gap:6px;margin-top:8px">
           ${match
             ? `<button class="btn-sm" style="flex:1;background:#fff;border-color:#888;color:#666" onclick="archivarDeclaracionPago('${f._id}')">🗄 Archivar</button>`
             : `<button class="btn-sm" style="flex:1;background:#fff;border-color:#1565c0;color:#1565c0" onclick="vincularDeclaracionManual('${f._id}',${f.loteN})">🔗 Vincular a un cobro</button>`}
@@ -2084,44 +2131,7 @@ function renderDeclaracionesPendientes(){
   }).join('');
 
   const nSinMatch = filas.filter(f=>!_buscarCobroParaDeclaracion(f)).length;
-  el.innerHTML = `<div class="card" style="border:1px solid #1565c0">
-    <div class="ct" style="color:#1565c0">📥 Pagos avisados por propietarios (${filas.length}${nSinMatch?` · ${nSinMatch} sin cobro`:''})</div>
-    ${filasHTML}
-  </div>`;
-}
-
-// 3ra columna de Control bancario: cruza la declaración del propietario (con
-// foto) contra la planilla de ingresos (COBROS), igual que la columna de
-// Lemon ya cruza el depósito bancario. Si algo se transfirió y el propietario
-// lo avisó pero todavía no tiene cobro cargado, tiene que saltar acá SIEMPRE
-// — es la idea de que ninguna transferencia se escape de la rendición.
-function renderConcDeclaraciones(){
-  const el = document.getElementById('conc-declaraciones');
-  if(!el) return;
-  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
-  const filas = DECLARACIONES_CACHE;
-  if(!filas.length){ el.innerHTML=''; return; }
-
-  const sinCobro = filas.filter(f=>!_buscarCobroParaDeclaracion(f));
-  const conCobro = filas.filter(f=>_buscarCobroParaDeclaracion(f));
-
-  el.innerHTML = `<div class="card" style="margin-top:8px;border:1px solid ${sinCobro.length?'#e53935':'#1a7a4a'}">
-    <div style="font-size:11px;font-weight:700;color:${sinCobro.length?'#e53935':'#1a7a4a'};margin-bottom:8px">
-      📋 Declaraciones de propietarios (con foto) vs. planilla de ingresos — ${conCobro.length} de ${filas.length} ya están en cobranzas
-    </div>
-    ${sinCobro.length ? `
-      <div style="font-size:11px;font-weight:700;color:#c62828;margin-bottom:4px">⚠️ Transferencias avisadas que NO están cargadas todavía:</div>
-      ${sinCobro.map(f=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid #f0f0f0;font-size:11px">
-          <span style="color:#555">${f.fecha} · ${f.lote} — ${f.propietario}</span>
-          <span style="display:flex;align-items:center;gap:6px">
-            <b style="color:#e53935">${fa(f.monto)}</b>
-            ${f.comprobanteImg?`<span onclick='verFotoGrande("${f.comprobanteImg}")' style="font-size:11px;cursor:pointer">🔍</span><a href="${f.comprobanteImg}" download="comprobante_${f.lote.replace(/\s+/g,'_')}.jpg" style="font-size:10px;text-decoration:none">⬇️</a>`:''}
-            <button onclick="vincularDeclaracionManual('${f._id}',${f.loteN})" style="font-size:10px;background:#1565c0;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer">🔗</button>
-          </span>
-        </div>`).join('')}
-    ` : `<div style="font-size:11px;color:#1a7a4a">✅ Todas las declaraciones de propietarios ya están reflejadas en la planilla de ingresos.</div>`}
-  </div>`;
+  el.innerHTML = `<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px">${filas.length} declaración${filas.length===1?'':'es'}${nSinMatch?` · ${nSinMatch} sin cobro cargado`:''}</div>${filasHTML}`;
 }
 
 // Vínculo manual: para cuando el monto no calza exacto contra ningún cobro
