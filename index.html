@@ -144,7 +144,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div class="login-err" id="login-err">Usuario o contraseña incorrectos</div>
     <div class="fg"><label style="display:flex;align-items:center;gap:6px"><svg width="20" height="20" viewBox="0 0 24 24" style="vertical-align:middle;flex-shrink:0"><circle cx="12" cy="12" r="12" fill="#C79A44"/><circle cx="12" cy="9.5" r="4" fill="#FBF7EE"/><path d="M4 21c0-4.4 3.6-7.5 8-7.5s8 3.1 8 7.5" fill="#FBF7EE"/></svg> Usuario</label><input type="text" id="l-user" placeholder="ej: jponce" autocomplete="username"></div>
     <div class="fg"><label>Contraseña</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
-    <button class="btn" onclick="doLogin()" style="margin-top:8px">Ingresar</button>
+    <button class="btn" id="btn-login" onclick="doLogin()" style="margin-top:8px">Ingresar</button>
   </div>
 </div>
 
@@ -883,12 +883,38 @@ window.doLogin = () => {
   const u = document.getElementById('l-user').value.trim().toLowerCase();
   const p = document.getElementById('l-pass').value;
   const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('btn-login');
   const meta = USUARIOS[u];
-  if(!meta){ errEl.style.display='block'; return; }
+  if(!meta){ errEl.textContent = 'Usuario o contraseña incorrectos'; errEl.style.display='block'; return; }
   errEl.style.display='none';
+  if(btn){ btn.disabled = true; btn.textContent = 'Ingresando...'; }
+
+  // Si por conexión lenta/caída la respuesta nunca llega, no puede quedar
+  // "pensando" para siempre — a los 10s se avisa y se reactiva el botón.
+  let resuelto = false;
+  const timeoutSeguridad = setTimeout(()=>{
+    if(resuelto) return;
+    resuelto = true;
+    errEl.textContent = 'No se pudo conectar (revisá tu conexión a internet) — probá de nuevo';
+    errEl.style.display='block';
+    if(btn){ btn.disabled = false; btn.textContent = 'Ingresar'; }
+  }, 10000);
+
   signInWithEmailAndPassword(auth, meta.email, p)
-    .catch(() => { errEl.style.display='block'; });
-  // El resto (mostrar pantalla, aplicar modo consulta, etc.) lo maneja onAuthStateChanged
+    .catch((e) => {
+      if(resuelto) return;
+      resuelto = true;
+      clearTimeout(timeoutSeguridad);
+      if(e && (e.code==='auth/network-request-failed')){
+        errEl.textContent = 'No se pudo conectar (revisá tu conexión a internet) — probá de nuevo';
+      } else {
+        errEl.textContent = 'Usuario o contraseña incorrectos';
+      }
+      errEl.style.display='block';
+      if(btn){ btn.disabled = false; btn.textContent = 'Ingresar'; }
+    });
+  // Si el login sale bien, onAuthStateChanged dispara y cambia de pantalla —
+  // no hace falta reactivar el botón en ese caso (la pantalla cambia sola).
 };
 
 window.cerrarSesion = () => {
