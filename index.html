@@ -4286,7 +4286,7 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
       conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
-      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA, obs:cobro.obs||'',
+      lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA, obs:cobro.obs||'', conc:cobro.conc||'',
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
       cobroId:cobroId||'', cobroColeccion:cobroColeccion||''
     };
@@ -4690,7 +4690,7 @@ window.reimprimirReciboDigital = (idx) => {
   if(!r) return;
   const out = document.getElementById('rc');
   const loteInfo = { l:r.lote, p:r.propietario };
-  const cobro = { monto:r.total, forma:r.forma, fecha:r.fecha, lemon:r.lemon||'', obs:r.obs||'' };
+  const cobro = { monto:r.total, forma:r.forma, fecha:r.fecha, lemon:r.lemon||'', obs:r.obs||'', conc:r.conc||'' };
   // El documento RECIBOS no guarda quién firmó — se infiere por nombre de
   // quien lo generó, ya que ambos administradores usan su propia firma.
   let firmanteId = '';
