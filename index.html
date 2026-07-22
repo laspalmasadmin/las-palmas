@@ -4108,8 +4108,12 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const out = document.getElementById('recibo-digital-out');
     out.innerHTML = `<div class="empty">Generando recibo...</div>`;
     const conceptos = _conceptosDesdeForm(cobro, capitalPer, interesPer);
-    let numero = parseInt(cobro.recibo);
-    if(isNaN(numero)) numero = await obtenerProximoReciboDigital();
+    // El número de un recibo DIGITAL siempre sale del contador atómico —
+    // nunca de lo tipeado a mano en "N° Recibo" (ese campo es para el N° de
+    // talonario en papel). Usar el valor tipeado acá permitía generar un
+    // número YA USADO por otro recibo digital, sin ningún chequeo (bug
+    // detectado 21/07/2026 con el recibo N.º 503 duplicado).
+    const numero = await obtenerProximoReciboDigital();
     const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
     const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
     const reciboDoc = {
@@ -4120,6 +4124,12 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
       cobroId:cobroId||'', cobroColeccion:cobroColeccion||''
     };
     await addDoc(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'), reciboDoc);
+    // Sincroniza el campo "recibo" del cobro con el número REAL asignado,
+    // para que el informe de ingresos muestre siempre el número correcto
+    // (antes podía mostrar el número tipeado a mano, distinto al de RECIBOS).
+    if(cobroId && cobroColeccion){
+      try{ await updateDoc(doc(db, cobroColeccion, cobroId), {recibo: numero}); }catch(e){ console.error('No se pudo sincronizar recibo en el cobro:', e); }
+    }
 
     const firmanteSel = document.getElementById('sel-firmante');
     const firmanteId = firmanteSel ? firmanteSel.value : '';
