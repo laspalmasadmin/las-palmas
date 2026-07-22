@@ -1813,7 +1813,17 @@ async function verificarCorrelatividadRecibos(){
     // Duplicados: mismo número de recibo en más de un documento (contando
     // los anulados también, porque el problema es el número repetido, no
     // si están vigentes).
-    const duplicados = Object.entries(porNumero).filter(([n,arr])=>arr.length>1);
+    // Un mismo N.º repetido en el MISMO lote, con uno anulado y otro vigente,
+    // es un caso normal (se corrigió y regeneró el recibo) — no es un error
+    // real y no hace falta mostrarlo. Solo interesa el duplicado cuando son
+    // LOTES DISTINTOS (ahí sí hay un choque real de numeración), o cuando
+    // hay más de un recibo vigente (no anulado) con el mismo número.
+    const duplicados = Object.entries(porNumero).filter(([n,arr])=>{
+      if(arr.length<2) return false;
+      const lotesDistintos = new Set(arr.map(x=>x.lote)).size > 1;
+      const vigentes = arr.filter(x=>!x.anulado).length;
+      return lotesDistintos || vigentes>1;
+    });
 
     // Recibos manuales (papel): sus números no deben marcarse como salto.
     const fuenteCobros = (typeof TODOS_COBROS !== 'undefined' && TODOS_COBROS.length) ? TODOS_COBROS : COBROS;
