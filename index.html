@@ -1954,7 +1954,14 @@ function renderDeclaracionesPendientes(){
         </div>
         <div style="color:#888;font-size:11px">${f.fecha} · ${f.forma}${f.obs?' · '+f.obs:''}</div>
         <div style="margin-top:3px">${estadoHTML}</div>
-        ${f.comprobanteImg?`<img src="${f.comprobanteImg}" style="max-width:100px;border-radius:6px;margin-top:4px;display:block">`:''}
+        ${f.comprobanteImg?`
+          <div style="margin-top:4px">
+            <a href="${f.comprobanteImg}" target="_blank" rel="noopener"><img src="${f.comprobanteImg}" style="max-width:100px;border-radius:6px;display:block;border:1px solid #ddd"></a>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <a href="${f.comprobanteImg}" target="_blank" rel="noopener" style="font-size:11px;color:#1565c0;text-decoration:none;font-weight:700">🔍 Ver en grande</a>
+              <a href="${f.comprobanteImg}" download="comprobante_${f.lote.replace(/\s+/g,'_')}_${(f.fecha||'').replace(/\//g,'-')}.jpg" style="font-size:11px;color:#1565c0;text-decoration:none;font-weight:700">⬇️ Descargar</a>
+            </div>
+          </div>`:''}
         <div style="display:flex;gap:6px;margin-top:6px">
           ${match
             ? `<button class="btn-sm" style="flex:1;background:#fff;border-color:#888;color:#666" onclick="archivarDeclaracionPago('${f._id}')">🗄 Archivar</button>`
@@ -1997,6 +2004,7 @@ function renderConcDeclaraciones(){
           <span style="color:#555">${f.fecha} · ${f.lote} — ${f.propietario}</span>
           <span style="display:flex;align-items:center;gap:6px">
             <b style="color:#e53935">${fa(f.monto)}</b>
+            ${f.comprobanteImg?`<a href="${f.comprobanteImg}" download="comprobante_${f.lote.replace(/\s+/g,'_')}.jpg" style="font-size:10px;text-decoration:none">⬇️</a>`:''}
             <button onclick="vincularDeclaracionManual('${f._id}',${f.loteN})" style="font-size:10px;background:#1565c0;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer">🔗</button>
           </span>
         </div>`).join('')}
@@ -4319,12 +4327,14 @@ window.leerComprobanteDeclaracion = (input) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      let w = img.width, h = img.height, max = 500;
+      // Resolución más alta que otras fotos de la app: acá no hay OCR de respaldo,
+      // Walter necesita poder leer los datos del comprobante a simple vista.
+      let w = img.width, h = img.height, max = 1000;
       if(w > h && w > max){ h = Math.round(h*max/w); w = max; }
       else if(h > max){ w = Math.round(w*max/h); h = max; }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      window._dpFotoDataURL = canvas.toDataURL('image/jpeg', 0.45);
+      window._dpFotoDataURL = canvas.toDataURL('image/jpeg', 0.7);
       document.getElementById('dp-foto-img').src = window._dpFotoDataURL;
       document.getElementById('dp-foto-preview').style.display = 'block';
     };
