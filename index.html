@@ -201,7 +201,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
   <button class="tab" data-tab="est" onclick="ST('est',this)">📊 Resumen financiero</button>
   <button class="tab" data-tab="rec" onclick="ST('rec',this)">🧾 Ver recibos</button>
   <button class="tab" data-tab="conc" onclick="ST('conc',this)">🏦 Control bancario</button>
-  <button class="tab" data-tab="declp" onclick="ST('declp',this)">📥 Declaraciones</button>
+  <button class="tab" data-tab="declp" onclick="ST('declp',this)">📥 Pagos informados</button>
   <button class="tab" data-tab="act" onclick="ST('act',this)">📜 Historial</button>
 </div>
 
@@ -2053,7 +2053,7 @@ function _buscarCobroParaDeclaracion(f){
 
 // Resumen compacto para Inicio — ya no lista cada declaración acá (se iba a
 // ir acumulando y ocupando mucho lugar visual); solo un total + botón que
-// lleva a la pestaña "📥 Declaraciones" con el detalle completo.
+// lleva a la pestaña "📥 Pagos informados" con el detalle completo.
 function renderDeclaracionesPendientes(){
   const el = document.getElementById('ini-declaraciones');
   if(!el) return;
@@ -2089,7 +2089,7 @@ function renderConcDeclaraciones(){
   </div>`;
 }
 
-// Pestaña propia "📥 Declaraciones": acá sí va el detalle completo, uno por
+// Pestaña propia "📥 Pagos informados": acá sí va el detalle completo, uno por
 // uno. La foto del comprobante NO se muestra directo (para no ocupar tanto
 // espacio a medida que se van acumulando) — solo un link para verla en
 // grande o descargarla cuando hace falta mirarla.
