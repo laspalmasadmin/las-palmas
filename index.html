@@ -4450,6 +4450,8 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
   }catch(e){
     console.error(e);
     toast('❌ Error generando recibo digital: '+e.message);
+    const out = document.getElementById('recibo-digital-out');
+    if(out) out.innerHTML = `<div class="empty" style="color:#c62828">❌ Error generando el recibo: ${e.message}<br><span style="font-size:11px;color:#888">El cobro sí se guardó — probá de nuevo, o revisá tu conexión.</span></div>`;
   }
 };
 
@@ -5666,9 +5668,9 @@ window.cobrarCuotaPlan = async () => {
 // mismo armado de PDF/QR que generarReciboDigital, pero con la leyenda del
 // plan como concepto y sin depender de los campos del formulario de Cobros
 // (que están en otra pestaña).
-async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, capitalPer, interesPer){
-  const out = document.getElementById('cc-recibo-out');
-  out.innerHTML = `<div class="empty">Generando recibo...</div>`;
+async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, capitalPer, interesPer, outId='cc-recibo-out'){
+  const out = document.getElementById(outId);
+  if(out) out.innerHTML = `<div class="empty">Generando recibo...</div>`;
   try{
     const conceptos = _conceptosDesdeForm(cobro, capitalPer, interesPer, {otro: planLabel});
     const numero = await obtenerProximoReciboDigital();
@@ -5692,7 +5694,7 @@ async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, cap
     const resumenTexto = `Recibo N.º ${numero} — ${loteInfo?loteInfo.l:''} — ${loteInfo?loteInfo.p:''} — Total: $${Math.round(cobro.monto).toLocaleString('es-AR')}`;
     window['_pdfPendiente_'+numero] = pdfDoc;
 
-    out.innerHTML = `
+    if(out) out.innerHTML = `
       <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px;margin-top:8px">
         <div style="font-size:12px;font-weight:700;color:#1a7a4a;margin-bottom:6px">🧾 Recibo N.º ${numero} generado</div>
         <iframe src="${blobUrl}" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px"></iframe>
@@ -5705,6 +5707,7 @@ async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, cap
   } catch(e){
     console.error(e);
     toast('❌ Error generando recibo digital: '+e.message);
+    if(out) out.innerHTML = `<div class="empty" style="color:#c62828">❌ Error generando el recibo: ${e.message}<br><span style="font-size:11px;color:#888">El cobro sí se guardó — probá de nuevo, o revisá tu conexión.</span></div>`;
   }
 }
 
@@ -6010,7 +6013,7 @@ window.cobrarCuotaAcuerdo = async () => {
     registrarActividad(`Cobró cuota ${n}/${a.cuotas.length} del acuerdo con abogado de ${a.lote} (${a.propietario}) · ${fa(cuota.importe)}`);
 
     if(document.getElementById('cca-recibo-digital').checked){
-      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, acuerdoLabel, capitalPer, interesPer);
+      await generarReciboDigitalPlan(cobro, loteInfo, cobroRef.id, acuerdoLabel, capitalPer, interesPer, 'cca-recibo-out');
     }
     renderDetalleAcuerdo();
   } catch(e){
