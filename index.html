@@ -2354,15 +2354,29 @@ function colC(){ return (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_' + MES.replace('-',''
 function colE(){ return 'E_' + MES.replace('-',''); }
 
 // Cargar cobros de todos los meses para calcDeudaEfectiva
+// Optimizado: los meses ya bajados una vez se guardan en cache (_MESES_COBROS_CARGADOS).
+// El mes actual (col activo) siempre se refresca con lo que ya trae el listener en
+// tiempo real (COBROS), sin volver a pegarle a Firestore. Los demás meses solo se
+// bajan la primera vez que se necesitan.
+const _MESES_COBROS_CARGADOS = {}; // { 'C_202601': [...docs] }
 async function cargarTodosCobros(){
   const meses = ['C_202601','C_202602','C_202603','C_202604','C_202605','C_202606','C_202607'];
-  TODOS_COBROS = [];
+  const colActual = colC();
   for(const col of meses){
+    if(col === colActual){
+      // El mes activo ya lo tenemos actualizado en memoria via el listener (COBROS)
+      _MESES_COBROS_CARGADOS[col] = COBROS.map(c=>({...c, _mesOrigen:col}));
+      continue;
+    }
+    if(_MESES_COBROS_CARGADOS[col]) continue; // ya en cache, no volver a leer
     try {
       const snap = await getDocs(collection(db, col));
-      snap.forEach(d=>{ TODOS_COBROS.push({...d.data(), _id:d.id, _mesOrigen:col}); });
-    } catch(e){ /* mes sin datos */ }
+      const docs = [];
+      snap.forEach(d=>{ docs.push({...d.data(), _id:d.id, _mesOrigen:col}); });
+      _MESES_COBROS_CARGADOS[col] = docs;
+    } catch(e){ _MESES_COBROS_CARGADOS[col] = []; /* mes sin datos */ }
   }
+  TODOS_COBROS = meses.flatMap(col => _MESES_COBROS_CARGADOS[col] || []);
   renderDeu();
   if(window.actualizarDeudaPreview) window.actualizarDeudaPreview();
   renderInicio();
