@@ -965,7 +965,8 @@ async function registrarActividad(accion){
 window.registrarActividad = registrarActividad;
 
 function listenActividad(){
-  onSnapshot(collection(db,'actividad'), snap=>{
+  const qAct = query(collection(db,'actividad'), orderBy('fecha','desc'), limit(200));
+  onSnapshot(qAct, snap=>{
     const items = [];
     snap.forEach(d=>items.push(d.data()));
     items.sort((a,b)=>b.fecha.localeCompare(a.fecha));
@@ -1904,10 +1905,20 @@ function _numsDeTextoRecibo(txt){
   const m = String(txt).match(/\d+/g);
   return m ? m.map(x=>parseInt(x)) : [];
 }
-async function verificarCorrelatividadRecibos(){
+let _correlatividadCache = {html:null, ts:0};
+const _CORRELATIVIDAD_TTL_MS = 2*60*1000; // 2 minutos
+async function verificarCorrelatividadRecibos(forzar=false){
   const ids = ['cob-alerta-recibos','rend-alerta-recibos'];
   const els = ids.map(id=>document.getElementById(id)).filter(Boolean);
   if(!els.length) return;
+  // Evita releer TODA la colección RECIBOS (500+ docs) cada vez que se
+  // cambia de pestaña — se reusa el resultado si no pasaron más de 2 min,
+  // salvo que se pida forzar (por ej. justo después de corregir un duplicado).
+  const ahora = Date.now();
+  if(!forzar && _correlatividadCache.html!==null && (ahora-_correlatividadCache.ts)<_CORRELATIVIDAD_TTL_MS){
+    els.forEach(el=>el.innerHTML=_correlatividadCache.html);
+    return;
+  }
   const INICIO_RECIBOS = 450; // numeración arranca en 450 según Juana
   try {
     const snap = await getDocs(collection(db, MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS'));
@@ -1980,6 +1991,7 @@ async function verificarCorrelatividadRecibos(){
         <div style="font-size:12px;color:#555">Rango en uso: N.º ${min} a ${max} (${nums.length} recibos digitales${detalleManual}), sin huecos — pero mirá el duplicado de arriba.</div>
       </div>`;
     }
+    _correlatividadCache = {html, ts:Date.now()};
     els.forEach(el=>el.innerHTML=html);
   } catch(e){
     console.error('verificarCorrelatividadRecibos:', e);
@@ -2019,7 +2031,7 @@ window.marcarRecibosManualesDelMes = async () => {
     toast(`✅ ${hechos} cobro(s) marcado(s) como recibo manual`);
     registrarActividad(`Marcó ${hechos} cobro(s) del mes como recibo manual (papel)`);
     cargarTodosCobros();
-    verificarCorrelatividadRecibos();
+    verificarCorrelatividadRecibos(true);
   } catch(e){
     console.error(e);
     toast('❌ Error marcando recibos manuales: '+e.message);
@@ -2087,7 +2099,7 @@ window.corregirReciboDuplicadoGenerico = async () => {
 
     toast(`✅ Recibo de ${elegidoR.lote} movido a N.º ${proximoLibre}${corregidosCobro?' · cobro sincronizado':' · revisá el cobro a mano si hace falta'}`);
     registrarActividad(`Corrigió recibo duplicado N.º ${numero} (${elegidoR.lote}) a N.º ${proximoLibre}`);
-    verificarCorrelatividadRecibos();
+    verificarCorrelatividadRecibos(true);
   } catch(e){
     toast('❌ Error: '+e.message);
   }
