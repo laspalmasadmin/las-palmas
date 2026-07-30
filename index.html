@@ -179,6 +179,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
       <option value="2026-05" selected>Mayo 2026</option>
       <option value="2026-06">Junio 2026</option>
       <option value="2026-07">Julio 2026</option>
+      <option value="2026-08">Agosto 2026</option>
     </select>
     <div class="dot" id="dot"></div>
     <button onclick="abrirBuscador()" title="Buscar lote o propietario" style="font-size:13px;padding:4px 9px;border-radius:6px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer">🔍</button>
@@ -2406,7 +2407,8 @@ window.cambiarMes = val => {
   MES_NOM = {
     '2026-05':'Mayo 2026',
     '2026-06':'Junio 2026', 
-    '2026-07':'Julio 2026'
+    '2026-07':'Julio 2026',
+    '2026-08':'Agosto 2026'
   }[val] || val;
   document.getElementById('hdr-p').textContent = 'Cobranzas ' + MES_NOM;
   document.getElementById('rend-tit').textContent = 'Rendición — ' + MES_NOM;
