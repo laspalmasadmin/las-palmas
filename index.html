@@ -2046,7 +2046,7 @@ window.subirTodosLosRecibosDelMesADrive = async () => {
         const loteCarpeta = 'LOTE ' + (r.lote||'').replace(/^L/i,'').trim().toUpperCase();
         const resp = await fetch(DRIVE_SCRIPT_URL, {
           method:'POST',
-          body: JSON.stringify({ lote: loteCarpeta, filename, pdfBase64 })
+          body: JSON.stringify({ mes: MES_NOM, lote: loteCarpeta, filename, pdfBase64 })
         });
         const j = await resp.json();
         if(j.success){
@@ -4056,7 +4056,7 @@ function subirReciboADrive(pdfDoc, filename, loteInfo){
     const loteCarpeta = 'LOTE ' + (loteInfo ? loteInfo.l.replace(/^L/i,'').trim().toUpperCase() : '');
     fetch(DRIVE_SCRIPT_URL, {
       method:'POST',
-      body: JSON.stringify({ lote: loteCarpeta, filename, pdfBase64 })
+      body: JSON.stringify({ mes: MES_NOM, lote: loteCarpeta, filename, pdfBase64 })
     }).catch(e=>console.error('No se pudo subir el recibo a Drive:', e));
   }catch(e){ console.error('Error preparando subida a Drive:', e); }
 }
