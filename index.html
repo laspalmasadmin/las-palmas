@@ -3446,7 +3446,11 @@ function desglosarCobro(c){
     const capResto = capTotal - capClasificado;
     const intResto = intTotal - intClasificado;
     if(capResto || intResto){
-      if(c.conc==='extraordinaria'){ r.capExt += capResto; r.intExt += intResto; }
+      // c.planId marca que este cobro es una cuota de Plan de Pagos por
+      // Extraordinarias — la clave 'otro' que la representa es SIEMPRE
+      // extraordinaria, incluso cuando conc='ambas' (cuota + ordinaria
+      // combinadas en el mismo cobro).
+      if(c.conc==='extraordinaria' || c.planId){ r.capExt += capResto; r.intExt += intResto; }
       else if(c.conc==='cargo'){ r.capCargo += capResto; }
       else { r.capOrd += capResto; r.intOrd += intResto; }
     }
