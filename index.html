@@ -564,9 +564,12 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
         <div class="fg"><label>Interés (si corresponde)</label><input type="number" id="cc-ord-interes" placeholder="0"></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:8px 0">
-        <input type="checkbox" id="cc-recibo-digital" checked style="width:16px;height:16px">
+        <input type="checkbox" id="cc-recibo-digital" checked onchange="document.getElementById('cc-recibo-manual-box').style.display=this.checked?'none':'block'" style="width:16px;height:16px">
         <span style="font-size:12px;font-weight:700;color:#1a7a4a">🧾 Generar recibo digital (PDF + QR)</span>
       </label>
+      <div id="cc-recibo-manual-box" style="display:none;background:#f7f7f7;border-radius:8px;padding:8px;margin-bottom:8px">
+        <div class="fg"><label>N° de recibo ya existente (si este cobro corresponde a un recibo que ya se generó antes, para no duplicar)</label><input type="text" id="cc-recibo-manual" placeholder="ej. 533"></div>
+      </div>
       <button class="btn" id="btn-cc" onclick="cobrarCuotaPlan()">✓ Registrar cobro</button>
       <button class="btn gr" onclick="document.getElementById('modal-cobrar-cuota').style.display='none'">Cancelar</button>
       <div id="cc-recibo-out"></div>
@@ -5712,6 +5715,8 @@ window.abrirCobrarCuota = (planId, n) => {
   document.getElementById('cc-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('cc-forma').value = 'Transferencia';
   document.getElementById('cc-recibo-digital').checked = true;
+  document.getElementById('cc-recibo-manual-box').style.display = 'none';
+  document.getElementById('cc-recibo-manual').value = '';
   document.getElementById('cc-incluye-ord').checked = false;
   document.getElementById('cc-ord-box').style.display = 'none';
   document.getElementById('cc-ord-periodo').innerHTML = PERIODOS_ORD.map(p=>`<option value="${p.k}">${p.label}</option>`).join('');
@@ -5750,6 +5755,12 @@ window.cobrarCuotaPlan = async () => {
       if(ordInt) interesPer[ordKey] = ordInt;
     }
     const montoTotal = Object.values(capitalPer).reduce((s,v)=>s+v,0) + Object.values(interesPer).reduce((s,v)=>s+v,0);
+    const generaReciboDigital = document.getElementById('cc-recibo-digital').checked;
+    // Si NO se genera un recibo digital nuevo, permite indicar el N° de un
+    // recibo ya existente (ej. cuando este cobro se está re-registrando
+    // porque no quedó guardado, pero el recibo en papel/PDF ya se le dio
+    // al propietario) — así no queda "—" y no se duplica el recibo.
+    const reciboManual = generaReciboDigital ? '' : (document.getElementById('cc-recibo-manual').value || '').trim();
 
     const cobro = {
       n: loteInfo ? loteInfo.n : null,
@@ -5760,7 +5771,7 @@ window.cobrarCuotaPlan = async () => {
       interesPer,
       capitalPer,
       forma,
-      recibo: '—',
+      recibo: reciboManual || '—',
       fecha,
       lemon: '',
       comprobanteImg: '',
