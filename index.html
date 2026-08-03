@@ -425,6 +425,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
   </div>
   <button class="btn" onclick="imprimirRend()" style="background:#1565c0;width:auto;padding:8px 16px;margin-bottom:8px">🖨️ Imprimir informe</button>
+  <button class="btn" onclick="corregirCobroL6SurCuota()" style="background:#e65100;width:auto;padding:8px 16px;margin-bottom:8px;margin-left:8px;font-size:11px">🔧 Corregir cobro L6 Sur (falta cuota $46.540)</button>
   <input class="srch" type="search" placeholder="🔍 Buscar..." oninput="filtrarR(this.value)">
   <div class="card" style="padding:8px">
     <div class="tbl"><table>
@@ -5797,6 +5798,57 @@ window.cobrarCuotaPlan = async () => {
     toast('❌ Error: '+e.message);
   }
   btn.disabled = false; btn.textContent = '✓ Registrar cobro';
+};
+
+// ── Fix puntual (03/08/2026): el cobro de julio de L6 Sur (Campos Fernando
+// David) se cargó por el formulario general de Registrar cobro con MAY ORD
+// + OTRO tildados, pero el campo "Otro" (los $46.540 de la cuota 1/18 del
+// Plan de Pagos por Extraordinarias, recibo N.º 533) quedó vacío. Este botón
+// busca ese cobro en la colección de julio y le agrega el capital faltante,
+// sin borrar ni duplicar nada. Es de un solo uso — puede dejarse en el código,
+// no hace nada si ya no encuentra el cobro incompleto.
+window.corregirCobroL6SurCuota = async () => {
+  try{
+    const snap = await getDocs(collection(db, (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_202607'));
+    const candidatos = [];
+    snap.forEach(d=>{
+      const c = d.data();
+      if(parseInt(c.n)===6 && !(c.capitalPer && c.capitalPer.otro)){
+        candidatos.push({id:d.id, ...c});
+      }
+    });
+    if(!candidatos.length){
+      toast('ℹ️ No se encontró un cobro de L6 Sur en julio con la cuota faltante — puede que ya esté corregido.');
+      return;
+    }
+    if(candidatos.length>1){
+      toast('⚠️ Hay más de un cobro candidato para L6 Sur — corregilo a mano para no tocar el que no corresponde.');
+      return;
+    }
+    const c = candidatos[0];
+    const montoNuevo = (c.monto||0) + 46540;
+    if(!confirm(`Cobro encontrado: L6 Sur, recibo ${c.recibo||'—'}, monto actual ${fa(c.monto||0)}.\n\n¿Agregar la cuota 1/18 del Plan de Pagos por Extraordinarias ($46.540) para que quede en ${fa(montoNuevo)}?`)) return;
+
+    const planLabel = 'Cuota 1/18 — Plan de Pagos por Extraordinarias (Opción 2) — Julio 2026';
+    const per = Array.isArray(c.per) ? [...new Set([...c.per,'otro'])] : ['otro'];
+    const plan = PLANES.find(p=>p.lote==='L6 Sur');
+
+    await updateDoc(doc(db, (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_202607', c.id), {
+      'capitalPer.otro': 46540,
+      per,
+      monto: montoNuevo,
+      conc: 'ambas',
+      obs: c.obs ? (c.obs + ' · ' + planLabel) : planLabel,
+      planLabel,
+      planId: plan ? plan.id : (c.planId||''),
+      planCuota: 1
+    });
+
+    toast(`✅ Corregido · L6 Sur ahora suma ${fa(montoNuevo)}`);
+    registrarActividad(`Corrigió cobro de L6 Sur (Campos Fernando David) agregando cuota 1/18 del plan ($46.540) faltante · recibo ${c.recibo||'—'}`);
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
 };
 
 // Versión del recibo digital para cobros de cuotas de un plan: reutiliza el
