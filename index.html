@@ -1167,6 +1167,14 @@ function generarMeses(){
     venc: new Date(`${d.y}-${String(d.m).padStart(2,'0')}-15`),
     co: d.co, cx: d.cx, recurring: !!d.recurring
   }));
+  // Los meses fijos "recurring" (Jun/Jul/Ago 2026) también se cargan acá con
+  // el mismo monto fijo — antes eran 3 líneas sueltas de forEach, ahora es
+  // parte del mismo mecanismo idempotente que los meses generados dinámicamente.
+  meses.filter(m=>m.recurring).forEach(m=>{
+    if(DEU.length && DEU[0][m.co] === undefined){
+      DEU.forEach(d => { d[m.co] = MONTO_ORD_MENSUAL; d[m.cx] = MONTO_EXT_MENSUAL; });
+    }
+  });
   let y = 2026, m = 9; // arranca en Sep 2026, el primer mes "generado"
   while(new Date(y,m-1,1) <= hoy){
     const co = `p${y}${String(m).padStart(2,'0')}_ord`;
