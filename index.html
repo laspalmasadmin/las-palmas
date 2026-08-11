@@ -950,6 +950,10 @@ onAuthStateChanged(auth, (fbUser) => {
       registrarActividad('Ingresó al sistema');
       listenActividad();
     }
+    // Cargar Planes de Pago temprano (antes de que cualquier pantalla calcule
+    // deuda), para que la exclusión de extraordinaria por plan activo funcione
+    // en todos lados desde el arranque, no solo en Inicio.
+    try { cargarPlanes(); } catch(e){ /* sin acceso o sin planes */ }
   } else {
     USER_ACTUAL = null;
     document.getElementById('login-screen').style.display='flex';
@@ -1134,10 +1138,61 @@ const DEU=[
   {l:'L44 Norte',p:'Szmyd Damian',            oe:0,ob:0,or:0,oa:90000,oy:90000,xr:0,xa:95000,xy:95000},
 ];
 
-// Agregar deuda junio 2026 a todos los lotes
-DEU.forEach(d => { d.ju_ord = 90000; d.ju_ext = 95000; });
-DEU.forEach(d => { d.jul_ord = 90000; d.jul_ext = 95000; });
-DEU.forEach(d => { d.ago_ord = 90000; d.ago_ext = 95000; });
+// ── GENERACIÓN AUTOMÁTICA DE MESES ──
+// Fuente única de verdad de los períodos de deuda. Los primeros 8 meses (Ene a
+// Ago 2026) son históricos con sus nombres de campo originales. A partir de
+// Sep 2026 los meses se generan solos, cada vez que se abre la app, con
+// monto fijo — no hace falta tocar código cada mes nuevo.
+// "recurring:true" marca los meses de monto fijo automático (Jun 2026 en
+// adelante), usado para excluir la extraordinaria de lotes con plan de pago
+// activo (ver loteTienePlanActivo más abajo).
+const MONTO_ORD_MENSUAL = 90000;
+const MONTO_EXT_MENSUAL = 95000;
+const MESES_NOMBRES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MESES_FIJOS_DEF = [
+  {y:2026,m:1, co:'oe',    cx:null},
+  {y:2026,m:2, co:'ob',    cx:null},
+  {y:2026,m:3, co:'or',    cx:'xr'},
+  {y:2026,m:4, co:'oa',    cx:'xa'},
+  {y:2026,m:5, co:'oy',    cx:'xy'},
+  {y:2026,m:6, co:'ju_ord',  cx:'ju_ext',  recurring:true},
+  {y:2026,m:7, co:'jul_ord', cx:'jul_ext', recurring:true},
+  {y:2026,m:8, co:'ago_ord', cx:'ago_ext', recurring:true},
+];
+function generarMeses(){
+  const hoy = new Date();
+  const meses = MESES_FIJOS_DEF.map(d=>({
+    mes: `${MESES_NOMBRES[d.m-1]} ${d.y}`,
+    mesCorto: MESES_NOMBRES[d.m-1],
+    venc: new Date(`${d.y}-${String(d.m).padStart(2,'0')}-15`),
+    co: d.co, cx: d.cx, recurring: !!d.recurring
+  }));
+  let y = 2026, m = 9; // arranca en Sep 2026, el primer mes "generado"
+  while(new Date(y,m-1,1) <= hoy){
+    const co = `p${y}${String(m).padStart(2,'0')}_ord`;
+    const cx = `p${y}${String(m).padStart(2,'0')}_ext`;
+    meses.push({
+      mes: `${MESES_NOMBRES[m-1]} ${y}`, mesCorto: MESES_NOMBRES[m-1],
+      venc: new Date(`${y}-${String(m).padStart(2,'0')}-15`),
+      co, cx, recurring: true
+    });
+    // Idempotente: si ya se generó este mes en una carga anterior, no lo pisa.
+    if(DEU.length && DEU[0][co] === undefined){
+      DEU.forEach(d => { d[co] = MONTO_ORD_MENSUAL; d[cx] = MONTO_EXT_MENSUAL; });
+    }
+    m++; if(m>12){ m=1; y++; }
+  }
+  return meses;
+}
+const MESES_GEN = generarMeses();
+// Claves de extraordinaria "recurrentes" (monto fijo automático) — se excluyen
+// para lotes con plan de pago activo, ver calcDeudaEfectiva.
+const EXT_KEYS_RECURRENTES = MESES_GEN.filter(m=>m.recurring && m.cx).map(m=>m.cx);
+function sumOrd(d){ return MESES_GEN.reduce((s,m)=> s+(d[m.co]||0), 0); }
+function sumExt(d){ return MESES_GEN.reduce((s,m)=> m.cx ? s+(d[m.cx]||0) : s, 0); }
+function loteTienePlanActivo(loteLabel){
+  return !!(typeof PLANES !== 'undefined' && PLANES && PLANES.some(p => p.lote === loteLabel && !p.caido));
+}
 
 // Estado global - COBROS como array simple
 let MES = '2026-05';
@@ -1818,8 +1873,8 @@ async function renderGestionCobranza(){
     } catch(e){ console.error('cargar acciones cobranza:', e); }
   }
 
-  const ORD_K = ['oe','ob','or','oa','oy','ju_ord','jul_ord','ago_ord'];
-  const EXT_K = ['xr','xa','xy','ju_ext','jul_ext','ago_ext'];
+  const ORD_K = MESES_GEN.map(m=>m.co);
+  const EXT_K = MESES_GEN.filter(m=>m.cx).map(m=>m.cx);
   const DEU_EF = DEU.map(d=>calcDeudaEfectiva(d));
   const items = [];
   DEU_EF.forEach(d=>{
@@ -3303,8 +3358,8 @@ window.elimEgr = async id => {
 };
 
 // DEUDORES — cruza DEU[] con COBROS reales de Firebase
-const PERIODOS_ORD = [{k:'oe',label:'Ene ord'},{k:'ob',label:'Feb ord'},{k:'or',label:'Mar ord'},{k:'oa',label:'Abr ord'},{k:'oy',label:'May ord'},{k:'ju_ord',label:'Jun ord'},{k:'jul_ord',label:'Jul ord'},{k:'ago_ord',label:'Ago ord'}];
-const PERIODOS_EXT = [{k:'xr',label:'Mar ext'},{k:'xa',label:'Abr ext'},{k:'xy',label:'May ext'},{k:'ju_ext',label:'Jun ext'},{k:'jul_ext',label:'Jul ext'},{k:'ago_ext',label:'Ago ext'}];
+const PERIODOS_ORD = MESES_GEN.map(m=>({k:m.co, label:`${m.mesCorto} ord`}));
+const PERIODOS_EXT = MESES_GEN.filter(m=>m.cx).map(m=>({k:m.cx, label:`${m.mesCorto} ext`}));
 
 function calcDeudaEfectiva(d){
   const loteInfo = LB.find(x=>x.l===d.l);
@@ -3338,11 +3393,17 @@ function calcDeudaEfectiva(d){
     });
   });
   const r = {...d};
-  ['oe','ob','or','oa','oy','ju_ord','jul_ord','ago_ord','xr','xa','xy','ju_ext','jul_ext','ago_ext'].forEach(campo=>{
+  const todasLasClaves = MESES_GEN.flatMap(m => m.cx ? [m.co, m.cx] : [m.co]);
+  todasLasClaves.forEach(campo=>{
     if(pagadoPor[campo]!==undefined){
       r[campo] = Math.max(0, (r[campo]||0) - pagadoPor[campo]);
     }
   });
+  // Lotes con plan de pago activo: la extraordinaria mensual recurrente no se
+  // suma aparte, ya está representada por la cuota del plan.
+  if(loteTienePlanActivo(d.l)){
+    EXT_KEYS_RECURRENTES.forEach(cx => { r[cx] = 0; });
+  }
   return r;
 }
 
@@ -3639,8 +3700,8 @@ window.autocompletarPeriodos = () => {
 function renderDeu(){
   const DEU_EF = DEU.map(d => calcDeudaEfectiva(d));
   document.getElementById('lista-deu').innerHTML=DEU_EF.map(d=>{
-    const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0);
-    const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0);
+    const totOrd=sumOrd(d);
+    const totExt=sumExt(d);
     const totGen=totOrd+totExt;
     if(!totGen) return'';
     const msMax=mesesDeuda(d);
@@ -3655,17 +3716,7 @@ function renderDeu(){
         <div class="lc-left">
           <div class="lc-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${d.l}&nbsp;&nbsp;<span style="font-weight:400">${d.p}</span>${badge}</div>
           <div class="lc-sub" style="margin-top:4px">
-            ${d.oe?`<span style="color:#1565c0">Ene ord: ${fa(d.oe)}</span>`:''}${d.ob?`<span style="color:#1565c0">Feb ord: ${fa(d.ob)}</span>`:''}
-            ${d.or?`<span style="color:#1565c0">Mar ord: ${fa(d.or)}</span>`:''}${d.oa?`<span style="color:#1565c0">Abr ord: ${fa(d.oa)}</span>`:''}
-            ${d.oy?`<span style="color:#1565c0">May ord: ${fa(d.oy)}</span>`:''}
-            ${d.xr?`<span style="color:#1a7a4a">Mar ext: ${fa(d.xr)}</span>`:''}${d.xa?`<span style="color:#1a7a4a">Abr ext: ${fa(d.xa)}</span>`:''}
-            ${d.xy?`<span style="color:#1a7a4a">May ext: ${fa(d.xy)}</span>`:''}
-            ${d.ju_ord?`<span style="color:#1565c0">Jun ord: ${fa(d.ju_ord)}</span>`:''}
-            ${d.ju_ext?`<span style="color:#1a7a4a">Jun ext: ${fa(d.ju_ext)}</span>`:''}
-            ${d.jul_ord?`<span style="color:#1565c0">Jul ord: ${fa(d.jul_ord)}</span>`:''}
-            ${d.jul_ext?`<span style="color:#1a7a4a">Jul ext: ${fa(d.jul_ext)}</span>`:''}
-            ${d.ago_ord?`<span style="color:#1565c0">Ago ord: ${fa(d.ago_ord)}</span>`:''}
-            ${d.ago_ext?`<span style="color:#1a7a4a">Ago ext: ${fa(d.ago_ext)}</span>`:''}
+            ${MESES_GEN.map(m=>`${d[m.co]?`<span style="color:#1565c0">${m.mesCorto} ord: ${fa(d[m.co])}</span>`:''}${m.cx&&d[m.cx]?`<span style="color:#1a7a4a">${m.mesCorto} ext: ${fa(d[m.cx])}</span>`:''}`).join('')}
           </div>
         </div>
         <div style="text-align:right;margin-left:8px">
@@ -3692,9 +3743,9 @@ function renderDeu(){
   }).join('');
 
   // Totales generales con deuda efectiva
-  const totOrdGen = DEU_EF.reduce((s,d)=>s+(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0),0);
-  const totExtGen = DEU_EF.reduce((s,d)=>s+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0),0);
-  const cntDeu = DEU_EF.filter(d=>(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0)>0).length;
+  const totOrdGen = DEU_EF.reduce((s,d)=>s+sumOrd(d),0);
+  const totExtGen = DEU_EF.reduce((s,d)=>s+sumExt(d),0);
+  const cntDeu = DEU_EF.filter(d=>(sumOrd(d)+sumExt(d))>0).length;
   document.getElementById('deu-cnt').textContent = cntDeu;
   document.getElementById('deu-tot-ord').textContent = fa(totOrdGen);
   document.getElementById('deu-tot-ext').textContent = fa(totExtGen);
@@ -3760,25 +3811,18 @@ CPN Juana B. Varvaro · M.P 7450`;
 
 function mesesDeuda(d){
   // Cuenta cuántos meses distintos tiene deuda (ordinaria O extraordinaria)
-  let count = 0;
-  if(d.oe||0) count++;
-  if(d.ob||0) count++;
-  if((d.or||0)||(d.xr||0)) count++;
-  if((d.oa||0)||(d.xa||0)) count++;
-  if((d.oy||0)||(d.xy||0)) count++;
-  if((d.ju_ord||0)||(d.ju_ext||0)||(d.jul_ord||0)||(d.jul_ext||0)||(d.ago_ord||0)||(d.ago_ext||0)) count++;
-  return count;
+  return MESES_GEN.reduce((count,m)=> ((d[m.co]||0)||(m.cx&&d[m.cx])) ? count+1 : count, 0);
 }
 
 function renderAlertas(DEU_EF){
   // Usar deuda efectiva (ya descontados los cobros del mes)
   const src = DEU_EF || DEU;
   const criticos = src.filter(d=>{
-    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0);
+    const totGen=(sumOrd(d)+sumExt(d));
     return totGen>0 && mesesDeuda(d) >= 3;
   });
   const atencion = src.filter(d=>{
-    const totGen=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0);
+    const totGen=(sumOrd(d)+sumExt(d));
     return totGen>0 && mesesDeuda(d) === 2;
   });
 
@@ -3788,8 +3832,8 @@ function renderAlertas(DEU_EF){
     html += `<div style="background:#fdecea;border-radius:8px;padding:10px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:8px">🔴 Aviso firme — 3 o más meses de deuda (${criticos.length} lotes)</div>`;
     criticos.forEach(d=>{
-      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0);
-      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0);
+      const totOrd=sumOrd(d);
+      const totExt=sumExt(d);
       const totGen=totOrd+totExt;
       const ms=mesesDeuda(d);
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #f5c6cb">
@@ -3807,8 +3851,8 @@ function renderAlertas(DEU_EF){
     html += `<div style="background:#fff8e1;border-radius:8px;padding:10px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:8px">🟠 Recordatorio — 2 meses de deuda (${atencion.length} lotes)</div>`;
     atencion.forEach(d=>{
-      const totOrd=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.ju_ord||0)+(d.jul_ord||0)+(d.ago_ord||0);
-      const totExt=(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ext||0)+(d.jul_ext||0)+(d.ago_ext||0);
+      const totOrd=sumOrd(d);
+      const totExt=sumExt(d);
       const totGen=totOrd+totExt;
       const ms=mesesDeuda(d);
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #ffe0b2">
@@ -3830,24 +3874,22 @@ function renderAlertas(DEU_EF){
 }
 
 // INTERESES
-// Ordinaria: oe=ene ob=feb or=mar oa=abr oy=may
-// Extraordinaria: xr=mar xa=abr xy=may
-const MI=[
-  {mes:'Ene 2026',venc:new Date('2026-01-15'),co:'oe',cx:null},
-  {mes:'Feb 2026',venc:new Date('2026-02-15'),co:'ob',cx:null},
-  {mes:'Mar 2026',venc:new Date('2026-03-15'),co:'or',cx:'xr'},
-  {mes:'Abr 2026',venc:new Date('2026-04-15'),co:'oa',cx:'xa'},
-  {mes:'May 2026',venc:new Date('2026-05-15'),co:'oy',cx:'xy'},
-  {mes:'Jun 2026',venc:new Date('2026-06-15'),co:'ju_ord',cx:'ju_ext'},
-  {mes:'Jul 2026',venc:new Date('2026-07-15'),co:'jul_ord',cx:'jul_ext'},
-  {mes:'Ago 2026',venc:new Date('2026-08-15'),co:'ago_ord',cx:'ago_ext'},
-];
+// MI: mismo listado de meses que MESES_GEN (fuente única), en orden cronológico.
+const MI = MESES_GEN;
 
 function calcD(d,fc){
   const td=0.04/30; let cap=0,int=0,filas='';
   MI.forEach(m=>{
     const cO=d[m.co]||0, cX=d[m.cx]||0;
-    if((!cO&&!cX)||fc<m.venc) return;
+    if(!cO&&!cX) return;
+    // Mes que todavía no venció (antes del día 15): se muestra el capital
+    // adeudado sin interés, para que el total a cobrar ya incluya el mes en
+    // curso aunque todavía no corresponda punitorio.
+    if(fc<m.venc){
+      cap+=cO+cX;
+      filas+=`<span style="background:#e3f2fd;padding:1px 6px;border-radius:4px;font-size:10px">${m.mes}: Ord ${fa(cO)} · Ext ${fa(cX)} (vence 15, sin interés aún)</span>`;
+      return;
+    }
     const dias=Math.floor((fc-m.venc)/86400000);
     // Mes en curso: el vencimiento es del mismo mes/año que la fecha de cálculo → 4% fijo
     const fcDate=new Date(fc);
@@ -4108,10 +4150,16 @@ async function obtenerProximoReciboDigital(){
 // Mapeo período -> "Mes Año" completo (para el recibo digital; las etiquetas
 // cortas de PERIOD_LABELS, tipo "Abr ord", se siguen usando en el resto del
 // formulario donde el espacio es chico).
-const PERIOD_MES_ANIO = {
-  oe:'Enero 2026', ob:'Febrero 2026', or:'Marzo 2026', oa:'Abril 2026', oy:'Mayo 2026', ju_ord:'Junio 2026', jul_ord:'Julio 2026', ago_ord:'Agosto 2026',
-  xr:'Marzo 2026', xa:'Abril 2026', xy:'Mayo 2026', ju_ext:'Junio 2026', jul_ext:'Julio 2026', ago_ext:'Agosto 2026'
-};
+const PERIOD_MES_ANIO = (() => {
+  const NOMBRES_LARGOS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const map = {};
+  MESES_GEN.forEach(m=>{
+    const label = `${NOMBRES_LARGOS[m.venc.getMonth()]} ${m.venc.getFullYear()}`;
+    map[m.co] = label;
+    if(m.cx) map[m.cx] = label;
+  });
+  return map;
+})();
 
 function _conceptosDesdeForm(cobro, capitalPer, interesPer, labelOverrides){
   const claves = [...new Set([...Object.keys(capitalPer), ...Object.keys(interesPer)])];
@@ -4968,7 +5016,7 @@ window.reimprimirReciboDigital = (idx) => {
 function poblarIntLote(){
   const s=document.getElementById('int-lote');
   DEU.forEach(d=>{
-    const tot=(d.oe||0)+(d.ob||0)+(d.or||0)+(d.oa||0)+(d.oy||0)+(d.xe||0)+(d.xb||0)+(d.xr||0)+(d.xa||0)+(d.xy||0)+(d.ju_ord||0)+(d.ju_ext||0)+(d.jul_ord||0)+(d.jul_ext||0)+(d.ago_ord||0)+(d.ago_ext||0);
+    const tot=(sumOrd(d)+sumExt(d));
     if(!tot) return;
     const o=document.createElement('option'); o.value=d.l+'|'+d.p; o.textContent=d.l+' — '+d.p; s.appendChild(o);
   });
