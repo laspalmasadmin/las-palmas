@@ -2289,8 +2289,16 @@ function renderInicio(){
 // de Control bancario, para no duplicar la lectura a Firestore.
 let DECLARACIONES_CACHE = [];
 let _declaracionesCargadas = false;
+// Estado de carga explícito para evitar reintentos infinitos: si falla (ej.
+// por permisos), _declEstado queda en 'error' y las funciones de render NO
+// vuelven a disparar cargarDeclaraciones() solas — antes, un fallo de
+// permisos hacía que se reintentara sin parar (recursión exponencial que
+// terminaba colgando/crasheando la pestaña por falta de memoria).
+let _declEstado = 'pendiente'; // 'pendiente' | 'cargando' | 'ok' | 'error'
 
 async function cargarDeclaraciones(){
+  if(_declEstado==='cargando') return; // ya hay una carga en curso, no duplicar
+  _declEstado = 'cargando';
   try {
     const snap = await getDocs(collection(db, 'DECLARACIONES_PAGO'));
     const filas = [];
@@ -2302,8 +2310,10 @@ async function cargarDeclaraciones(){
     filas.sort((a,b)=>(a.creadoEn||'').localeCompare(b.creadoEn||''));
     DECLARACIONES_CACHE = filas;
     _declaracionesCargadas = true;
+    _declEstado = 'ok';
   } catch(e){
     console.error('cargarDeclaraciones:', e);
+    _declEstado = 'error';
   }
   renderDeclaracionesPendientes();
   renderConcDeclaraciones();
@@ -2323,7 +2333,9 @@ function _buscarCobroParaDeclaracion(f){
 function renderDeclaracionesPendientes(){
   const el = document.getElementById('ini-declaraciones');
   if(!el) return;
-  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
+  if(_declEstado==='pendiente'){ cargarDeclaraciones(); return; }
+  if(_declEstado==='cargando') return;
+  if(_declEstado==='error'){ el.innerHTML=''; return; }
   const filas = DECLARACIONES_CACHE;
   if(!filas.length){ el.innerHTML=''; return; }
   const nSinMatch = filas.filter(f=>!_buscarCobroParaDeclaracion(f)).length;
@@ -2342,7 +2354,9 @@ function renderDeclaracionesPendientes(){
 function renderConcDeclaraciones(){
   const el = document.getElementById('conc-declaraciones');
   if(!el) return;
-  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
+  if(_declEstado==='pendiente'){ cargarDeclaraciones(); return; }
+  if(_declEstado==='cargando') return;
+  if(_declEstado==='error'){ el.innerHTML=''; return; }
   const filas = DECLARACIONES_CACHE;
   if(!filas.length){ el.innerHTML=''; return; }
   const sinCobro = filas.filter(f=>!_buscarCobroParaDeclaracion(f)).length;
@@ -2362,7 +2376,9 @@ function renderConcDeclaraciones(){
 function renderDeclaracionesTab(){
   const el = document.getElementById('declp-lista');
   if(!el) return;
-  if(!_declaracionesCargadas){ cargarDeclaraciones(); return; }
+  if(_declEstado==='pendiente'){ cargarDeclaraciones(); return; }
+  if(_declEstado==='cargando') return;
+  if(_declEstado==='error'){ el.innerHTML='<div class="empty">No se pudieron cargar las declaraciones de pago (sin permiso). Avisá a la administración.</div>'; return; }
   const filas = DECLARACIONES_CACHE;
   if(!filas.length){ el.innerHTML='<div class="empty">Todavía no hay ninguna declaración de pago avisada.</div>'; return; }
 
