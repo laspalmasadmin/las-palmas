@@ -516,8 +516,9 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
 <!-- PLANES DE PAGO -->
 <div id="pnl-plan" class="pnl">
   <div id="plan-lista-view">
-    <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <button class="btn az" onclick="abrirNuevoPlan()" style="width:auto;padding:8px 16px">➕ Nuevo plan</button>
+      <button class="btn-sm" style="width:auto;padding:8px 14px;background:#fff;border-color:#e65100;color:#e65100" onclick="aplicarCompensacionL6Sur()">🔧 Aplicar compensación $82.400 — cuota 18 L6 Sur</button>
     </div>
     <div class="g2">
       <div class="met"><div class="ml">Planes vigentes</div><div class="mv vd" id="plan-cnt-vig">—</div></div>
@@ -5736,6 +5737,42 @@ window.cerrarDetallePlan = () => {
   cargarPlanes();
 };
 
+// ── Fix puntual (11/08/2026): el convenio firmado de L6 Sur (Campos Fernando
+// David) tiene una cláusula TERCERA que compensa un pago previo de $82.400
+// (hecho antes del convenio, imputado a cuenta de Abril 2026) contra la
+// cuota N.º 18, dejando un saldo real a pagar de $24.271 en esa cuota — pero
+// el plan se cargó en la app con calcularCuotasOpcion(), que no conoce esa
+// compensación, así que la app mostraba el importe nominal completo
+// ($106.671) en vez del saldo real. Este botón corrige el documento ya
+// existente en PLANES_PAGO sumando importeOriginal/credito/observacion a la
+// cuota 18, sin tocar ninguna otra cuota ni recalcular nada más. Es de un
+// solo uso — no hace nada si la cuota ya tiene el ajuste aplicado.
+window.aplicarCompensacionL6Sur = async () => {
+  try{
+    const ref = doc(db, colPlanes(), 'L6_Sur');
+    const snap = await getDoc(ref);
+    if(!snap.exists()){ toast('⚠️ No se encontró el plan de L6 Sur (PLANES_PAGO/L6_Sur)'); return; }
+    const plan = snap.data();
+    const cuota18 = plan.cuotas && plan.cuotas.find(c=>c.n===18);
+    if(!cuota18){ toast('⚠️ El plan de L6 Sur no tiene cuota 18'); return; }
+    if(cuota18.credito){
+      toast('✅ La compensación ya estaba aplicada — nada que hacer');
+      return;
+    }
+    if(!confirm(`Cuota 18 (${cuota18.periodo}) figura hoy en ${fa(cuota18.importe)}.\n\nSe va a dejar en $24.271 (saldo real tras compensar $82.400 según cláusula TERCERA del convenio), guardando el importe nominal original para referencia.\n\n¿Confirmás?`)) return;
+    cuota18.importeOriginal = cuota18.importe;
+    cuota18.credito = 82400;
+    cuota18.importe = 24271;
+    cuota18.observacion = 'Compensada en $82.400 (crédito pago previo Abril 2026, cláusula TERCERA) — saldo a pagar $24.271';
+    await setDoc(ref, plan);
+    toast('✅ Compensación aplicada · L6 Sur cuota 18/18');
+    registrarActividad('Aplicó la compensación de $82.400 en la cuota 18 del plan de L6 Sur (Campos Fernando David), según cláusula TERCERA del convenio');
+    cargarPlanes();
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
+};
+
 function renderDetallePlan(){
   const p = PLANES.find(x=>x.id===_planActualId);
   if(!p) return;
@@ -5767,10 +5804,13 @@ function renderDetallePlan(){
       : (!p.caido && c.estado==='pagada')
         ? `<button class="btn-sm" style="background:#fff;border-color:#c62828;color:#c62828" onclick="deshacerCuotaPlan('${p.id}',${c.n})">↩️ Deshacer</button>`
         : '';
+    const notaCredito = c.credito
+      ? `<div style="font-size:9px;color:#e65100;font-weight:600;margin-top:2px">${c.observacion || ('Compensada en '+fa(c.credito))} · nominal ${fa(c.importeOriginal)}</div>`
+      : '';
     return `<tr>
       <td>${c.n}/18</td>
       <td>${c.periodo}</td>
-      <td class="num">${fa(c.importe)}</td>
+      <td class="num">${fa(c.importe)}${notaCredito}</td>
       <td style="color:${colores[c.estado]};font-weight:700">${etiquetas[c.estado]}</td>
       <td>${accion}</td>
     </tr>`;
