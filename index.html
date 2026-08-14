@@ -519,6 +519,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <button class="btn az" onclick="abrirNuevoPlan()" style="width:auto;padding:8px 16px">➕ Nuevo plan</button>
       <button class="btn-sm" style="width:auto;padding:8px 14px;background:#fff;border-color:#e65100;color:#e65100" onclick="aplicarCompensacionL6Sur()">🔧 Aplicar compensación $82.400 — cuota 18 L6 Sur</button>
+      <button class="btn-sm" style="width:auto;padding:8px 14px;background:#fff;border-color:#e65100;color:#e65100" onclick="aplicarCompensacionL21Sur()">🔧 Aplicar compensación $190.000 — cuotas 17/18 L21 Sur</button>
     </div>
     <div class="g2">
       <div class="met"><div class="ml">Planes vigentes</div><div class="mv vd" id="plan-cnt-vig">—</div></div>
@@ -5735,6 +5736,47 @@ window.cerrarDetallePlan = () => {
   document.getElementById('plan-detalle-view').style.display = 'none';
   document.getElementById('plan-lista-view').style.display = 'block';
   cargarPlanes();
+};
+
+// ── Fix puntual (14/08/2026): el convenio firmado de L21 Sur (Orieta Osvaldo)
+// tiene un crédito por pagos previos de $190.000, que se compensa contra las
+// últimas dos cuotas: cuota 18 ($106.671) queda cancelada por completo, y el
+// remanente ($83.329) se aplica a la cuota 17 ($101.591), dejando un saldo
+// real a pagar de $18.262 en esa cuota — pero el plan se cargó en la app con
+// calcularCuotasOpcion(), que no conoce esa compensación, así que mostraba
+// los importes nominales completos. Este botón corrige el documento ya
+// existente en PLANES_PAGO sumando importeOriginal/credito/observacion a las
+// cuotas 17 y 18, sin tocar ninguna otra cuota ni recalcular nada más. Es de
+// un solo uso — no hace nada si ya está aplicado.
+window.aplicarCompensacionL21Sur = async () => {
+  try{
+    const ref = doc(db, colPlanes(), 'L21_Sur');
+    const snap = await getDoc(ref);
+    if(!snap.exists()){ toast('⚠️ No se encontró el plan de L21 Sur (PLANES_PAGO/L21_Sur)'); return; }
+    const plan = snap.data();
+    const cuota17 = plan.cuotas && plan.cuotas.find(c=>c.n===17);
+    const cuota18 = plan.cuotas && plan.cuotas.find(c=>c.n===18);
+    if(!cuota17 || !cuota18){ toast('⚠️ El plan de L21 Sur no tiene cuotas 17 y/o 18'); return; }
+    if(cuota17.credito || cuota18.credito){
+      toast('✅ La compensación ya estaba aplicada — nada que hacer');
+      return;
+    }
+    if(!confirm(`Cuota 17 (${cuota17.periodo}) figura hoy en ${fa(cuota17.importe)} y cuota 18 (${cuota18.periodo}) en ${fa(cuota18.importe)}.\n\nSe va a aplicar el crédito de $190.000: cuota 18 queda cancelada ($0) y cuota 17 queda en $18.262 (saldo real tras compensar $83.329), guardando los importes nominales originales para referencia.\n\n¿Confirmás?`)) return;
+    cuota17.importeOriginal = cuota17.importe;
+    cuota17.credito = 83329;
+    cuota17.importe = 18262;
+    cuota17.observacion = 'Compensada en $83.329 (crédito pago previo, cláusula TERCERA) — saldo a pagar $18.262';
+    cuota18.importeOriginal = cuota18.importe;
+    cuota18.credito = cuota18.importe;
+    cuota18.importe = 0;
+    cuota18.observacion = 'Cancelada por compensación (crédito pago previo, cláusula TERCERA)';
+    await setDoc(ref, plan);
+    toast('✅ Compensación aplicada · L21 Sur cuotas 17 y 18/18');
+    registrarActividad('Aplicó la compensación de $190.000 en las cuotas 17 y 18 del plan de L21 Sur (Orieta Osvaldo), según cláusula TERCERA del convenio');
+    cargarPlanes();
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
 };
 
 // ── Fix puntual (11/08/2026): el convenio firmado de L6 Sur (Campos Fernando
