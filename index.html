@@ -4459,6 +4459,21 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   );
   docPDF.text(leyenda, W/2, y, {align:'center'});
 
+  // Marca de agua ANULADO: se dibuja al final, encima de todo el contenido,
+  // para que un recibo anulado nunca pueda confundirse con uno vigente aunque
+  // se reimprima o se reenvíe por WhatsApp.
+  if(meta.anulado){
+    const H = docPDF.internal.pageSize.getHeight();
+    docPDF.saveGraphicsState();
+    docPDF.setGState(new docPDF.GState({opacity:0.35}));
+    docPDF.setTextColor(198,40,40);
+    docPDF.setFontSize(38);
+    docPDF.setFont(undefined,'bold');
+    docPDF.text('ANULADO', W/2, H/2, {align:'center', angle:35});
+    docPDF.restoreGraphicsState();
+    docPDF.setFont(undefined,'normal');
+  }
+
   return docPDF;
 }
 
@@ -5016,12 +5031,12 @@ window.reimprimirReciboDigital = (idx) => {
     if(gp.includes('walter')) firmanteId = 'wvallejo';
     else if(gp.includes('juan')) firmanteId = 'jponce';
   }
-  const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'' };
+  const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'', anulado:!!r.anulado };
   try{
     const pdfDoc = construirPDFRecibo(meta, loteInfo, r.conceptos||[], cobro);
     const filename = `Recibo_${r.recibo}_${(r.propietario||'').replace(/\s+/g,'_')}.pdf`;
     const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
-    const resumenTexto = `Recibo N.º ${r.recibo} — ${r.lote} — ${r.propietario} — Total: $${Math.round(r.total||0).toLocaleString('es-AR')}`;
+    const resumenTexto = `Recibo N.º ${r.recibo} — ${r.lote} — ${r.propietario} — Total: $${Math.round(r.total||0).toLocaleString('es-AR')}${r.anulado?' — ANULADO':''}`;
     window['_pdfReimpreso'] = pdfDoc;
     out.innerHTML = `
       <div class="fg" style="border:1px solid #cfe8dc;border-radius:8px;padding:10px">
