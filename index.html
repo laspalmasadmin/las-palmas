@@ -1179,7 +1179,12 @@ function generarMeses(){
     }
   });
   let y = 2026, m = 9; // arranca en Sep 2026, el primer mes "generado"
-  while(new Date(y,m-1,1) <= hoy){
+  // Margen de 6 meses hacia adelante de la fecha real: evita que un período
+  // (ej. Septiembre) falte en la lista de cobro solo porque la fecha del
+  // dispositivo todavía no llegó a ese mes, aunque el administrador ya
+  // esté cobrando/generando recibos para ese período en la app.
+  const limiteGeneracion = new Date(hoy.getFullYear(), hoy.getMonth()+6, 1);
+  while(new Date(y,m-1,1) <= limiteGeneracion){
     const co = `p${y}${String(m).padStart(2,'0')}_ord`;
     const cx = `p${y}${String(m).padStart(2,'0')}_ext`;
     meses.push({
