@@ -5015,13 +5015,52 @@ window.buscarRecibosLote = async () => {
     out.innerHTML = `<div class="card" style="padding:8px">
       <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">${b.l} — ${b.p}: ${recibos.length} recibo${recibos.length===1?'':'s'} digital${recibos.length===1?'':'es'}</div>
       ${recibos.map((r,i)=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #eee;font-size:12px">
-          <span>${r.anulado?'🚫 ':''}N.º ${String(r.recibo).padStart(4,'0')} · ${r.fecha||'—'} · ${fa(r.total||0)} · <span style="color:#1565c0;font-weight:600">guardado en: ${MES_NOM_MAP[r.mes]||r.mes||'—'}</span></span>
-          <button class="btn-sm" style="width:auto;padding:4px 10px" onclick="reimprimirReciboDigital(${i})">👁️ Ver</button>
+        <div style="padding:6px 0;border-bottom:.5px solid #eee;font-size:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span>${r.anulado?'🚫 ':''}N.º ${String(r.recibo).padStart(4,'0')} · ${r.fecha||'—'} · ${fa(r.total||0)} · <span style="color:#1565c0;font-weight:600">guardado en: ${MES_NOM_MAP[r.mes]||r.mes||'—'}</span></span>
+            <button class="btn-sm" style="width:auto;padding:4px 10px" onclick="reimprimirReciboDigital(${i})">👁️ Ver</button>
+          </div>
+          ${(r.cobroId && r.cobroColeccion) ? `
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+            <select id="mv-mes-${i}" style="font-size:11px;padding:3px 4px;border:1px solid #ddd;border-radius:5px">
+              ${Object.entries(MES_NOM_MAP).map(([k,v])=>`<option value="${k}" ${k===r.mes?'selected':''}>${v}</option>`).join('')}
+            </select>
+            <button class="btn-sm" style="width:auto;padding:3px 8px;font-size:11px;background:#ef6c00;color:#fff;border:none" onclick="moverCobroDeMes(${i}, document.getElementById('mv-mes-${i}').value)">📦 Mover a este mes</button>
+          </div>` : `<div style="font-size:10px;color:#c62828;margin-top:2px">Sin cobro vinculado — no se puede mover automáticamente</div>`}
         </div>`).join('')}
     </div>`;
   }catch(e){
     out.innerHTML = `<div class="empty">Error al buscar: ${e.message}</div>`;
+  }
+};
+
+// Mueve un cobro (y su recibo vinculado) de la colección de un mes a la de
+// otro — corrige el caso en que el selector MES estaba en un mes distinto
+// al real cuando se registró el cobro, dejándolo invisible en el informe
+// del mes correcto. Copia el documento del cobro a la colección destino
+// (mismo id), lo borra de la colección origen, y actualiza el campo "mes"
+// y "cobroColeccion" del recibo digital vinculado para que quede consistente.
+window.moverCobroDeMes = async (idx, mesDestino) => {
+  const r = window._recibosLoteActual && window._recibosLoteActual[idx];
+  if(!r || !r.cobroId || !r.cobroColeccion){ toast('⚠️ Este recibo no tiene cobro vinculado'); return; }
+  if(mesDestino === r.mes){ toast('Ya está guardado en ese mes'); return; }
+  const colDestino = (MODO_PRUEBA?PRUEBA_BASE:'') + 'C_' + mesDestino.replace('-','');
+  if(!confirm(`¿Mover el cobro del recibo N.º ${r.recibo} de ${r.mes} a ${mesDestino}?\n\nEsto traslada el cobro real (no solo el recibo) para que aparezca en el informe del mes correcto.`)) return;
+  try{
+    const cobroSnap = await getDoc(doc(db, r.cobroColeccion, r.cobroId));
+    if(!cobroSnap.exists()){ toast('❌ No se encontró el cobro original — puede que ya se haya movido o borrado'); return; }
+    const cobroData = cobroSnap.data();
+    await setDoc(doc(db, colDestino, r.cobroId), cobroData);
+    await deleteDoc(doc(db, r.cobroColeccion, r.cobroId));
+    const recibosCol = MODO_PRUEBA?PRUEBA_BASE+'RECIBOS':'RECIBOS';
+    const qR = query(collection(db, recibosCol), where('recibo','==', r.recibo));
+    const snapR = await getDocs(qR);
+    for(const d of snapR.docs){ await updateDoc(doc(db, recibosCol, d.id), {mes: mesDestino, cobroColeccion: colDestino}); }
+    registrarActividad(`Movió el cobro del recibo N.º ${r.recibo} (${r.lote}) de ${r.mes} a ${mesDestino}`);
+    toast(`✅ Cobro movido a ${mesDestino}`);
+    buscarRecibosLote();
+  }catch(e){
+    toast('❌ Error al mover: '+e.message);
   }
 };
 
