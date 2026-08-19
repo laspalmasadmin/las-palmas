@@ -4982,11 +4982,14 @@ function actualizarEstado(){
 }
 
 // RECIBOS
+// Antes solo listaba lotes con cobro en el mes activo (COBROS), pero la
+// búsqueda de abajo (buscarRecibosLote) consulta RECIBOS sin filtrar por
+// mes — eso hacía que un lote con recibo real pero sin cobro en el mes
+// actualmente seleccionado ni apareciera para poder elegirlo. Ahora lista
+// siempre los 84 lotes, sin depender del mes activo.
 function poblarRS(){
   const s=document.getElementById('rs'); s.innerHTML='';
-  const cobPorLote={};
-  COBROS.forEach(c=>{ const k=parseInt(c.n); if(!cobPorLote[k]) cobPorLote[k]=[]; cobPorLote[k].push(c); });
-  LB.forEach(b=>{ if(cobPorLote[b.n]){ const o=document.createElement('option'); o.value=b.n; o.textContent=b.l+' — '+b.p; s.appendChild(o); } });
+  LB.slice().sort((a,b)=>a.n-b.n).forEach(b=>{ const o=document.createElement('option'); o.value=b.n; o.textContent=b.l+' — '+b.p; s.appendChild(o); });
   if(s.options.length) buscarRecibosLote();
 }
 
