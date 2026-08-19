@@ -2504,8 +2504,26 @@ function colE(){ return 'E_' + MES.replace('-',''); }
 // tiempo real (COBROS), sin volver a pegarle a Firestore. Los demás meses solo se
 // bajan la primera vez que se necesitan.
 const _MESES_COBROS_CARGADOS = {}; // { 'C_202601': [...docs] }
+// Antes esta lista estaba escrita a mano y se cortaba en 'C_202607' (Julio) —
+// eso significaba que cobros de Agosto en adelante NUNCA se contaban en el
+// cálculo de deuda de un lote, aunque estuvieran guardados en la colección
+// correcta (causa del caso L35 Sur: pago de Julio no se reflejaba porque el
+// cache de ese mes había quedado desactualizado y ningún mes posterior a
+// Julio se volvía a revisar). Ahora se genera dinámicamente desde Ene-2026
+// hasta 2 meses por delante de la fecha real, igual que MESES_GEN.
+function listaColeccionesCobrosHistoricas(){
+  const arr = [];
+  let y=2026, m=1;
+  const hoy = new Date();
+  const limite = new Date(hoy.getFullYear(), hoy.getMonth()+2, 1);
+  while(new Date(y,m-1,1) <= limite){
+    arr.push('C_'+String(y)+String(m).padStart(2,'0'));
+    m++; if(m>12){ m=1; y++; }
+  }
+  return arr;
+}
 async function cargarTodosCobros(){
-  const meses = ['C_202601','C_202602','C_202603','C_202604','C_202605','C_202606','C_202607'];
+  const meses = listaColeccionesCobrosHistoricas();
   const colActual = colC();
   for(const col of meses){
     if(col === colActual){
@@ -4005,12 +4023,17 @@ function calcularLiquidacionParaLote(lote, prop, fc){
   return {...d, lote, prop, fc, filas, capOrd, intOrd, capExt, intExt, totOrd, totExt, totGen, periodosBreak, loteN};
 }
 
-window.calcLote=()=>{
+window.calcLote=async()=>{
   const sel=document.getElementById('int-lote').value;
   if(!sel){toast('⚠️ Seleccioná un lote');return;}
   const fc=new Date(document.getElementById('int-f2').value);
   if(!fc||isNaN(fc)){toast('⚠️ Ingresá fecha');return;}
   fc.setHours(23,59,59);
+  // Refresca los cobros de TODOS los meses sin usar cache, antes de calcular
+  // — evita mostrar un período como impago por un cache viejo de un mes que
+  // ya se cargó antes de un cobro nuevo (ver caso L35 Sur).
+  Object.keys(_MESES_COBROS_CARGADOS).forEach(k=>delete _MESES_COBROS_CARGADOS[k]);
+  await cargarTodosCobros();
   const[lote,prop]=sel.split('|');
   const res = calcularLiquidacionParaLote(lote, prop, fc);
   if(!res){toast('No encontrado');return;}
@@ -5052,6 +5075,13 @@ window.moverCobroDeMes = async (idx, mesDestino) => {
     const qR = query(collection(db, recibosCol), where('recibo','==', r.recibo));
     const snapR = await getDocs(qR);
     for(const d of snapR.docs){ await updateDoc(doc(db, recibosCol, d.id), {mes: mesDestino, cobroColeccion: colDestino}); }
+    // Invalida el cache de ambos meses (origen y destino) para que la
+    // próxima recarga de TODOS_COBROS traiga los datos reales de Firestore
+    // y no la copia vieja guardada antes del movimiento — si no se invalida,
+    // el cálculo de deuda podía seguir mostrando el período como impago.
+    delete _MESES_COBROS_CARGADOS['C_'+r.mes.replace('-','')];
+    delete _MESES_COBROS_CARGADOS[colDestino.replace(PRUEBA_BASE,'')];
+    await cargarTodosCobros();
     registrarActividad(`Movió el cobro del recibo N.º ${r.recibo} (${r.lote}) de ${r.mes} a ${mesDestino}`);
     toast(`✅ Cobro movido a ${mesDestino}`);
     buscarRecibosLote();
