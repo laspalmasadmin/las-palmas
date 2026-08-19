@@ -5011,11 +5011,12 @@ window.buscarRecibosLote = async () => {
     if(!recibos.length){ out.innerHTML = '<div class="empty">Este lote todavía no tiene ningún recibo digital generado.</div>'; return; }
     recibos.sort((a,b)=>(parseInt(b.recibo)||0)-(parseInt(a.recibo)||0));
     window._recibosLoteActual = recibos;
+    const MES_NOM_MAP = {'2026-05':'May-26','2026-06':'Jun-26','2026-07':'Jul-26','2026-08':'Ago-26','2026-09':'Sep-26'};
     out.innerHTML = `<div class="card" style="padding:8px">
       <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">${b.l} — ${b.p}: ${recibos.length} recibo${recibos.length===1?'':'s'} digital${recibos.length===1?'':'es'}</div>
       ${recibos.map((r,i)=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid #eee;font-size:12px">
-          <span>${r.anulado?'🚫 ':''}N.º ${String(r.recibo).padStart(4,'0')} · ${r.fecha||'—'} · ${fa(r.total||0)}</span>
+          <span>${r.anulado?'🚫 ':''}N.º ${String(r.recibo).padStart(4,'0')} · ${r.fecha||'—'} · ${fa(r.total||0)} · <span style="color:#1565c0;font-weight:600">guardado en: ${MES_NOM_MAP[r.mes]||r.mes||'—'}</span></span>
           <button class="btn-sm" style="width:auto;padding:4px 10px" onclick="reimprimirReciboDigital(${i})">👁️ Ver</button>
         </div>`).join('')}
     </div>`;
