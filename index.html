@@ -340,23 +340,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     </div>
     <div class="fg" id="deuda-preview" style="display:none;background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:8px 10px;margin-bottom:8px"></div>
     <div class="fg"><label>Períodos que cancela</label>
-<div class="per-grid">
-  <label class="per-item ord"><input type="checkbox" name="sper" value="oe"> Ene ord</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="ob"> Feb ord</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="or"> Mar ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="xr"> Mar ext</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="oa"> Abr ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="xa"> Abr ext</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="oy"> May ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="xy"> May ext</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="ju_ord"> Jun ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="ju_ext"> Jun ext</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="jul_ord"> Jul ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="jul_ext"> Jul ext</label>
-  <label class="per-item ord"><input type="checkbox" name="sper" value="ago_ord"> Ago ord</label>
-  <label class="per-item ext"><input type="checkbox" name="sper" value="ago_ext"> Ago ext</label>
-  <label class="per-item otro"><input type="checkbox" name="sper" value="otro"> Otro</label>
-</div></div>
+<div class="per-grid" id="per-grid"></div></div>
     <div class="fg" id="interes-wrap">
       <label>Capital e interés por período (editable a mano)</label>
       <div id="interes-periodos"></div>
@@ -758,23 +742,7 @@ select.mes{font-size:11px;padding:4px 8px;border-radius:8px;border:none;backgrou
     <div id="mod-info" style="background:#e8f5ee;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:700;color:#14603a;margin-bottom:11px"></div>
     <div class="fg"><label>Concepto</label><select id="me-c"><option value="ordinaria">Exp. Ordinaria</option><option value="extraordinaria">Exp. Extraordinaria</option><option value="cargo">Cargo</option></select></div>
     <div class="fg"><label>Períodos que cancela</label>
-<div class="per-grid" id="me-per-grid">
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="oe"> Ene ord</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="ob"> Feb ord</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="or"> Mar ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="xr"> Mar ext</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="oa"> Abr ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="xa"> Abr ext</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="oy"> May ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="xy"> May ext</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="ju_ord"> Jun ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="ju_ext"> Jun ext</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="jul_ord"> Jul ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="jul_ext"> Jul ext</label>
-  <label class="per-item ord"><input type="checkbox" name="me-per" value="ago_ord"> Ago ord</label>
-  <label class="per-item ext"><input type="checkbox" name="me-per" value="ago_ext"> Ago ext</label>
-  <label class="per-item otro"><input type="checkbox" name="me-per" value="otro"> Otro</label>
-</div></div>
+<div class="per-grid" id="me-per-grid"></div></div>
     <div class="fg" id="me-interes-wrap">
       <label>Capital e interés por período (editable a mano)</label>
       <div id="me-interes-periodos"></div>
@@ -3393,6 +3361,25 @@ window.elimEgr = async id => {
 // DEUDORES — cruza DEU[] con COBROS reales de Firebase
 const PERIODOS_ORD = MESES_GEN.map(m=>({k:m.co, label:`${m.mesCorto} ord`}));
 const PERIODOS_EXT = MESES_GEN.filter(m=>m.cx).map(m=>({k:m.cx, label:`${m.mesCorto} ext`}));
+
+// Arma los checkboxes de "Períodos que cancela" dinámicamente desde
+// MESES_GEN (en vez de la lista fija que antes se cortaba en Ago 2026 y no
+// dejaba cargar cobros de Septiembre en adelante). MESES_GEN ya se
+// autoextiende 6 meses por delante de la fecha real, así que este listado
+// nunca vuelve a quedarse corto.
+function renderPeriodosCheckboxes(containerId, nameAttr){
+  const cont = document.getElementById(containerId);
+  if(!cont) return;
+  let html = '';
+  MESES_GEN.forEach(m=>{
+    html += `<label class="per-item ord"><input type="checkbox" name="${nameAttr}" value="${m.co}"> ${m.mesCorto} ord</label>`;
+    if(m.cx) html += `<label class="per-item ext"><input type="checkbox" name="${nameAttr}" value="${m.cx}"> ${m.mesCorto} ext</label>`;
+  });
+  html += `<label class="per-item otro"><input type="checkbox" name="${nameAttr}" value="otro"> Otro</label>`;
+  cont.innerHTML = html;
+}
+renderPeriodosCheckboxes('per-grid', 'sper');
+renderPeriodosCheckboxes('me-per-grid', 'me-per');
 
 function calcDeudaEfectiva(d){
   const loteInfo = LB.find(x=>x.l===d.l);
