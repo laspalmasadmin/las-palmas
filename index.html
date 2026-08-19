@@ -2088,7 +2088,7 @@ window.subirTodosLosRecibosDelMesADrive = async () => {
           if(gp.includes('walter')) firmanteId = 'wvallejo';
           else if(gp.includes('juan')) firmanteId = 'jponce';
         }
-        const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'' };
+        const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'', fechaEmision:r.fechaEmision||'' };
         const pdfDoc = construirPDFRecibo(meta, loteInfo, r.conceptos||[], cobro);
         const filename = `Recibo_${r.recibo}_${(r.propietario||'').replace(/\s+/g,'_')}.pdf`;
         const pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
@@ -4331,9 +4331,13 @@ function construirPDFRecibo(meta, loteInfo, conceptos, cobro){
   docPDF.text(`N.º ${String(meta.recibo).padStart(4,'0')}`, 10, y+6);
   docPDF.setFontSize(9);
   docPDF.setTextColor(30,30,30);
-  docPDF.text('Fecha', W-10, y, {align:'right'});
+  docPDF.text('Fecha de pago', W-10, y, {align:'right'});
   docPDF.setFontSize(11);
   docPDF.text(cobro.fecha||'', W-10, y+6, {align:'right'});
+  if(meta.fechaEmision){
+    docPDF.setFontSize(7); docPDF.setTextColor(140,140,140);
+    docPDF.text(`Recibo emitido: ${meta.fechaEmision}`, W-10, y+11, {align:'right'});
+  }
 
   y += 14;
   docPDF.setDrawColor(220,220,220);
@@ -4606,9 +4610,14 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
     const numero = await obtenerProximoReciboDigital();
     const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
     const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
+    // fechaEmision: el día real en que se genera el recibo — distinto de
+    // cobro.fecha, que es la fecha en que Walter/Juan dicen que se recibió
+    // el pago (puede ser un día anterior, ej. cobra el 15 y recién carga el
+    // recibo el 17). Ambas se muestran en el PDF para que quede claro.
+    const fechaEmision = new Date().toLocaleDateString('es-AR');
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
-      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
+      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, fechaEmision, mes:MES,
       lemon:cobro.lemon||'', comprobanteImg:cobro.comprobanteImg||'', prueba:MODO_PRUEBA, obs:cobro.obs||'', conc:cobro.conc||'',
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
       cobroId:cobroId||'', cobroColeccion:cobroColeccion||''
@@ -4623,7 +4632,7 @@ window.generarReciboDigital = async (cobro, loteInfo, capitalPer, interesPer, co
 
     const firmanteSel = document.getElementById('sel-firmante');
     const firmanteId = firmanteSel ? firmanteSel.value : '';
-    const meta = {recibo:numero, codigo, urlVerificacion, firmanteId, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
+    const meta = {recibo:numero, codigo, urlVerificacion, firmanteId, firmante:USER_ACTUAL?USER_ACTUAL.nombre:'', fechaEmision};
     const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
     const filename = `Recibo_${numero}_${(loteInfo?loteInfo.p:'').replace(/\s+/g,'_')}.pdf`;
     const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
@@ -4936,7 +4945,7 @@ window.previsualizarReciboEjemplo = () => {
 
   const firmanteSelEj = document.getElementById('sel-firmante');
   const firmanteIdEj = firmanteSelEj ? firmanteSelEj.value : '';
-  const meta = {recibo:'0000 (vista previa)', codigo:'LP-PREVIEW-DEMO', urlVerificacion: location.origin+location.pathname+'#verificar/EJEMPLO', firmanteId:firmanteIdEj, firmante:'Juan Ponce / Walter Vallejo'};
+  const meta = {recibo:'0000 (vista previa)', codigo:'LP-PREVIEW-DEMO', urlVerificacion: location.origin+location.pathname+'#verificar/EJEMPLO', firmanteId:firmanteIdEj, firmante:'Juan Ponce / Walter Vallejo', fechaEmision:new Date().toLocaleDateString('es-AR')};
   const pdfDoc = construirPDFRecibo(meta, loteInfoEjemplo, conceptosEjemplo, cobroEjemplo);
   const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
   const resumenEjemplo = `Vista previa — ${loteInfoEjemplo.l} — ${loteInfoEjemplo.p} — Total: $${cobroEjemplo.monto.toLocaleString('es-AR')}`;
@@ -5068,7 +5077,7 @@ window.reimprimirReciboDigital = (idx) => {
     if(gp.includes('walter')) firmanteId = 'wvallejo';
     else if(gp.includes('juan')) firmanteId = 'jponce';
   }
-  const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'', anulado:!!r.anulado };
+  const meta = { recibo:r.recibo, codigo:r.codigo, urlVerificacion:r.urlVerificacion, firmanteId, firmante:r.generadoPor||'', anulado:!!r.anulado, fechaEmision:r.fechaEmision||'' };
   try{
     const pdfDoc = construirPDFRecibo(meta, loteInfo, r.conceptos||[], cobro);
     const filename = `Recibo_${r.recibo}_${(r.propietario||'').replace(/\s+/g,'_')}.pdf`;
@@ -6105,9 +6114,10 @@ async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, cap
     const numero = await obtenerProximoReciboDigital();
     const codigo = `LP-${numero}-${_codigoAleatorio(4)}`;
     const urlVerificacion = `${location.origin}${location.pathname}#verificar/${codigo}`;
+    const fechaEmision = new Date().toLocaleDateString('es-AR');
     const reciboDoc = {
       recibo:numero, codigo, lote:loteInfo?loteInfo.l:'', propietario:loteInfo?loteInfo.p:'',
-      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, mes:MES,
+      conceptos, total:cobro.monto, forma:cobro.forma, fecha:cobro.fecha, fechaEmision, mes:MES,
       lemon:'', comprobanteImg:'', prueba:MODO_PRUEBA,
       urlVerificacion, generadoPor:(USER_ACTUAL?USER_ACTUAL.nombre:''), timestamp:new Date().toISOString(),
       cobroId:cobroId||'', cobroColeccion:colC()
@@ -6116,7 +6126,7 @@ async function generarReciboDigitalPlan(cobro, loteInfo, cobroId, planLabel, cap
 
     const firmanteSel = document.getElementById('sel-firmante');
     const firmanteId = firmanteSel ? firmanteSel.value : '';
-    const meta = {recibo:numero, codigo, urlVerificacion, firmanteId, firmante:USER_ACTUAL?USER_ACTUAL.nombre:''};
+    const meta = {recibo:numero, codigo, urlVerificacion, firmanteId, firmante:USER_ACTUAL?USER_ACTUAL.nombre:'', fechaEmision};
     const pdfDoc = construirPDFRecibo(meta, loteInfo, conceptos, cobro);
     const filename = `Recibo_${numero}_${(loteInfo?loteInfo.p:'').replace(/\s+/g,'_')}.pdf`;
     const blobUrl = URL.createObjectURL(pdfDoc.output('blob'));
